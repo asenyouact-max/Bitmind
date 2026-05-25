@@ -1,0 +1,48 @@
+/* Virtualized Device List Styles */
+.device-list-container {
+  padding: 20px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.virtualized-device-list {
+  padding: 20px;
+  max-height: 400px;
+  overflow: hidden;
+  position: relative;
+}
+
+.virtual-viewport {
+  height: 400px;
+  overflow-y: auto;
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+
+.virtual-content {
+  position: relative;
+  width: 100%;
+}
+
+/* Performance optimizations */
+.virtualized-device-list * {
+  will-change: transform;
+  contain: layout style paint;
+}
+
+.device-list-container .device-card,
+.virtualized-device-list .device-card {
+  margin-bottom: 16px;
+  animation: none; /* Disable animations during virtual scrolling */
+}
+
+.virtualized-device-list .device-card:hover {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0.8; }
+  to { opacity: 1; }
+}

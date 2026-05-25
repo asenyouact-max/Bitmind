@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitmind v7 - Mining Control Room</title>
+    <link rel="stylesheet" href="src/styles/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">
+                    <span class="logo-bit">BIT</span><span class="logo-mind">MIND</span>
+                </h1>
+                <div class="header-actions">
+                    <button class="buy-bitminer-btn" id="buyBitminerBtn">
+                        <span class="btn-icon">🛒</span>
+                        <span class="btn-text">Buy Bitminer</span>
+                    </button>
+                    <button class="connect-miner-btn" id="connectMinerBtn">
+                        <span class="btn-icon">⛏️</span>
+                        <span class="btn-text">Connect Miner</span>
+                    </button>
+                    <div class="connection-status">
+                        <div class="status-indicator" id="connectionStatus">
+                            <span class="status-dot"></span>
+                            <span class="status-text">Connecting...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Mining Control Room -->
+        <main class="control-room">
+            <!-- System Overview Panel -->
+            <section class="panel system-overview">
+                <div class="panel-header">
+                    <h2>🧠 SYSTEM OVERVIEW</h2>
+                    <div class="health-indicator" id="systemHealth">
+                        <span class="health-dot"></span>
+                        <span class="health-text">CHECKING...</span>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="system-metrics">
+                        <div class="metric-block">
+                            <div class="metric-label">BLOCK HEIGHT</div>
+                            <div class="metric-value block-height" id="blockHeight">--</div>
+                        </div>
+                        <div class="metric-block">
+                            <div class="metric-label">SYSTEM UPTIME</div>
+                            <div class="metric-value uptime" id="systemUptime">--</div>
+                        </div>
+                        <div class="metric-block">
+                            <div class="metric-label">ACTIVE DEVICES</div>
+                            <div class="metric-value devices-online" id="devicesOnline">0</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Mining Job Panel -->
+            <section class="panel mining-job">
+                <div class="panel-header">
+                    <h2>⚙️ MINING JOB</h2>
+                    <div class="job-indicator" id="jobStatus">
+                        <span class="job-pulse"></span>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="job-details">
+                        <div class="job-field">
+                            <div class="field-label">JOB ID</div>
+                            <div class="field-value job-id" id="jobId">--</div>
+                        </div>
+                        <div class="job-field">
+                            <div class="field-label">TARGET</div>
+                            <div class="field-value target" id="jobTarget">--</div>
+                        </div>
+                        <div class="job-field">
+                            <div class="field-label">PREVIOUS BLOCK</div>
+                            <div class="field-value prev-block" id="prevBlockHash">--</div>
+                        </div>
+                        <div class="job-field">
+                            <div class="field-label">LAST UPDATE</div>
+                            <div class="field-value last-update" id="lastUpdate">--</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Device Network Visualization -->
+            <section class="panel device-network">
+                <div class="panel-header">
+                    <h2>📡 DEVICE NETWORK</h2>
+                    <div class="network-stats">
+                        <span class="online-count" id="onlineCount">0</span>
+                        <span class="total-count">/ <span id="totalCount">0</span></span>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="device-grid" id="deviceGrid">
+                        <div class="no-devices">NO DEVICES CONNECTED</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Real-time Charts -->
+            <section class="panel charts-panel">
+                <div class="panel-header">
+                    <h2>📈 MINING STATISTICS</h2>
+                    <div class="chart-controls">
+                        <button class="chart-btn active" data-chart="shares">SHARES/MIN</button>
+                        <button class="chart-btn" data-chart="acceptance">ACCEPTANCE</button>
+                        <button class="chart-btn" data-chart="performance">PERFORMANCE</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="chart-container">
+                        <canvas id="miningChart"></canvas>
+                    </div>
+                    <div class="chart-legend">
+                        <div class="legend-item">
+                            <span class="legend-color accepted"></span>
+                            <span class="legend-label">Accepted: <span id="acceptedCount">0</span></span>
+                        </div>
+                        <div class="legend-item">
+                            <span class="legend-color rejected"></span>
+                            <span class="legend-label">Rejected: <span id="rejectedCount">0</span></span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Live Event Feed -->
+            <section class="panel event-feed">
+                <div class="panel-header">
+                    <h2>🔥 LIVE EVENT FEED</h2>
+                    <div class="feed-controls">
+                        <button class="feed-btn active" data-filter="all">ALL</button>
+                        <button class="feed-btn" data-filter="shares">SHARES</button>
+                        <button class="feed-btn" data-filter="jobs">JOBS</button>
+                        <button class="feed-btn" data-filter="devices">DEVICES</button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div class="event-stream" id="eventStream">
+                        <div class="no-events">WAITING FOR MINING ACTIVITY...</div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Connect Miner Modal -->
+    <div class="modal-overlay" id="connectMinerModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span class="modal-icon">⛏️</span>
+                    Connect New Miner
+                </h2>
+                <button class="modal-close" id="closeModalBtn">
+                    <span class="close-icon">×</span>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="minerRegistrationForm">
+                    <div class="form-group">
+                        <label class="form-label" for="minerName">Miner Name</label>
+                        <input 
+                            type="text" 
+                            id="minerName" 
+                            class="form-input" 
+                            placeholder="My Mining Rig"
+                            required
+                        >
+                        <div class="form-hint">Choose a name to identify your miner</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="walletAddress">Wallet Address</label>
+                        <input 
+                            type="text" 
+                            id="walletAddress" 
+                            class="form-input" 
+                            placeholder="bc1q..."
+                            required
+                        >
+                        <div class="form-hint">Bitcoin wallet address for payouts</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label" for="workerName">Worker Name (Optional)</label>
+                        <input 
+                            type="text" 
+                            id="workerName" 
+                            class="form-input" 
+                            placeholder="worker1"
+                        >
+                        <div class="form-hint">Optional worker name for pool identification</div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="generated-id">
+                            <label class="form-label">Miner ID</label>
+                            <div class="id-display">
+                                <span class="id-value" id="generatedMinerId">Generating...</span>
+                                <button type="button" class="regenerate-btn" id="regenerateIdBtn">
+                                    <span class="regenerate-icon">🔄</span>
+                                </button>
+                            </div>
+                            <div class="form-hint">Unique identifier for your miner</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stratum-info">
+                        <h3 class="stratum-title">Stratum Connection Info</h3>
+                        <div class="stratum-details">
+                            <div class="stratum-item">
+                                <span class="stratum-label">Host:</span>
+                                <span class="stratum-value" id="stratumHost">Detecting...</span>
+                            </div>
+                            <div class="stratum-item">
+                                <span class="stratum-label">Port:</span>
+                                <span class="stratum-value">3333</span>
+                            </div>
+                        </div>
+                        <div class="stratum-note">
+                            Configure your mining software with these details
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelBtn">Cancel</button>
+                <button type="submit" form="minerRegistrationForm" class="btn btn-primary" id="registerBtn">
+                    <span class="btn-spinner hidden" id="registerSpinner"></span>
+                    <span class="btn-text" id="registerBtnText">Register Miner</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buy Bitminer Modal -->
+    <div class="modal-overlay" id="buyBitminerModal">
+        <div class="modal-content buy-bitminer-modal">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span class="modal-icon">🛒</span>
+                    Buy Your Bitminer
+                </h2>
+                <button class="modal-close" id="closeBuyModalBtn">
+                    <span class="close-icon">×</span>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="product-subtitle">
+                    Plug & play Bitcoin mining device. No setup required.
+                </div>
+                
+                <!-- Product Card -->
+                <div class="product-card">
+                    <div class="product-header">
+                        <div class="product-image">
+                            <div class="device-icon">🔌</div>
+                        </div>
+                        <div class="product-title-section">
+                            <h3 class="product-title">Bitmind ESP32 Bitminer</h3>
+                            <div class="product-badge">New</div>
+                        </div>
+                    </div>
+                    
+                    <div class="product-features">
+                        <div class="feature-item">
+                            <span class="feature-icon">✓</span>
+                            <span class="feature-text">Plug & play device</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">✓</span>
+                            <span class="feature-text">Connects automatically to Bitmind</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">✓</span>
+                            <span class="feature-text">Low power consumption</span>
+                        </div>
+                        <div class="feature-item">
+                            <span class="feature-icon">✓</span>
+                            <span class="feature-text">Beginner friendly</span>
+                        </div>
+                    </div>
+                    
+                    <div class="product-specs">
+                        <div class="spec-item">
+                            <div class="spec-label">Estimated Hashrate</div>
+                            <div class="spec-value">~50 MH/s</div>
+                        </div>
+                        <div class="spec-item">
+                            <div class="spec-label">Power Usage</div>
+                            <div class="spec-value">~5W</div>
+                        </div>
+                        <div class="spec-item">
+                            <div class="spec-label">Price</div>
+                            <div class="spec-value price">€49</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- How It Works Section -->
+                <div class="how-it-works">
+                    <h3 class="how-title">How it works</h3>
+                    <div class="steps">
+                        <div class="step-item">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <div class="step-title">Buy Bitminer</div>
+                                <div class="step-description">Order your plug & play mining device</div>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <div class="step-title">Plug it in</div>
+                                <div class="step-description">Connect to power and WiFi</div>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <div class="step-title">Connect via dashboard</div>
+                                <div class="step-description">Device appears automatically</div>
+                            </div>
+                        </div>
+                        <div class="step-item">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <div class="step-title">Start mining</div>
+                                <div class="step-description">Watch your Bitcoin grow</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancelBuyBtn">Cancel</button>
+                <button type="button" class="btn btn-primary buy-now-btn" id="buyNowBtn">
+                    <span class="btn-spinner hidden" id="buySpinner"></span>
+                    <span class="btn-text" id="buyBtnText">Buy Now</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Coming Soon Modal -->
+    <div class="modal-overlay" id="paymentModal">
+        <div class="modal-content payment-modal">
+            <div class="modal-header">
+                <h2 class="modal-title">
+                    <span class="modal-icon">💳</span>
+                    Payments Coming Soon
+                </h2>
+                <button class="modal-close" id="closePaymentModalBtn">
+                    <span class="close-icon">×</span>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="payment-message">
+                    <div class="payment-icon">🚀</div>
+                    <div class="payment-text">
+                        <h3>Get Ready to Mine!</h3>
+                        <p>We're working hard to bring you secure payment options including:</p>
+                        <ul class="payment-options">
+                            <li>💳 Credit/Debit Cards</li>
+                            <li>₿ Bitcoin Payments</li>
+                            <li>📱 Mobile Payment Options</li>
+                        </ul>
+                        <p>Sign up for our newsletter to be notified when payments go live!</p>
+                    </div>
+                </div>
+                
+                <div class="newsletter-signup">
+                    <div class="newsletter-title">Get Notified</div>
+                    <div class="newsletter-form">
+                        <input type="email" class="newsletter-input" placeholder="Enter your email">
+                        <button class="newsletter-btn">Notify Me</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" id="closePaymentBtn">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Notification -->
+    <div class="notification" id="successNotification">
+        <div class="notification-content">
+            <span class="notification-icon">✅</span>
+            <span class="notification-message" id="notificationMessage">Miner registered successfully!</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="src/app.js"></script>
+    <script src="src/ui/deviceManager.js"></script>
+    
+    <!-- Debug Test Script -->
+    <script>
+        // Direct button test to verify functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔧 DEBUG: DOM Content Loaded');
+            
+            // Test Connect Miner button directly
+            const connectBtn = document.getElementById('connectMinerBtn');
+            if (connectBtn) {
+                console.log('🔧 DEBUG: Connect Miner button found directly');
+                connectBtn.addEventListener('click', function() {
+                    console.log('🔧 DEBUG: Connect Miner button clicked directly!');
+                    
+                    // Test modal functionality directly
+                    const modal = document.getElementById('connectMinerModal');
+                    if (modal) {
+                        console.log('🔧 DEBUG: Opening modal directly...');
+                        modal.classList.add('open');
+                        modal.classList.remove('hidden');
+                        console.log('🔧 DEBUG: Modal opened directly!');
+                    } else {
+                        console.error('🔧 DEBUG: Modal not found!');
+                    }
+                });
+            } else {
+                console.error('🔧 DEBUG: Connect Miner button NOT found directly');
+            }
+            
+            // Test Buy Bitminer button directly
+            const buyBtn = document.getElementById('buyBitminerBtn');
+            if (buyBtn) {
+                console.log('🛒 DEBUG: Buy Bitminer button found directly');
+                buyBtn.addEventListener('click', function() {
+                    console.log('🛒 DEBUG: Buy Bitminer button clicked directly!');
+                    
+                    // Test modal functionality directly
+                    const modal = document.getElementById('buyBitminerModal');
+                    if (modal) {
+                        console.log('🛒 DEBUG: Opening Buy Bitminer modal directly...');
+                        modal.classList.add('open');
+                        modal.classList.remove('hidden');
+                        console.log('🛒 DEBUG: Buy Bitminer modal opened directly!');
+                    } else {
+                        console.error('🛒 DEBUG: Buy Bitminer modal not found!');
+                    }
+                });
+            } else {
+                console.error('🛒 DEBUG: Buy Bitminer button NOT found directly');
+            }
+            
+            // Test modal elements directly
+            const connectModal = document.getElementById('connectMinerModal');
+            const buyModal = document.getElementById('buyBitminerModal');
+            
+            console.log('🔧 DEBUG: Modal elements found directly:');
+            console.log('🔧 DEBUG: - connectModal:', connectModal);
+            console.log('🛒 DEBUG: - buyModal:', buyModal);
+        });
+    </script>
+</body>
+</html>

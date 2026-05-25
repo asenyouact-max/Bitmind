@@ -1,0 +1,20 @@
+{
+  "name": "bitmind-websocket-tests",
+  "version": "1.0.0",
+  "description": "WebSocket stability testing suite for Bitmind mining system",
+  "main": "client.js",
+  "scripts": {
+    "reconnect": "node reconnect-test.js",
+    "sync": "node sync-test.js",
+    "cleanup": "node cleanup-test.js",
+    "longrun": "node longrun-test.js",
+    "chaos": "node chaos-test.js",
+    "run-all": "node run-all-tests.js"
+  },
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "keywords": ["websocket", "testing", "bitcoin", "mining"],
+  "author": "Bitmind Team",
+  "license": "MIT"
+}

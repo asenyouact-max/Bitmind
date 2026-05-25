@@ -1,0 +1,106 @@
+/* Button Component Styles */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  min-width: 120px;
+}
+
+.btn-primary {
+  background: #f7931a;
+  color: white;
+  box-shadow: 0 4px 15px rgba(247, 147, 26, 0.3);
+  transition: all 0.25s ease;
+}
+
+.btn-primary:hover:not(.btn-disabled):not(.btn-loading) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(247, 147, 26, 0.5);
+  background: #ff9d3d;
+}
+
+.btn-primary:active:not(.btn-disabled):not(.btn-loading) {
+  transform: translateY(0);
+  box-shadow: 0 4px 20px rgba(247, 147, 26, 0.4);
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-primary:hover:not(.btn-disabled):not(.btn-loading)::before {
+  left: 100%;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(247, 147, 26, 0.3);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  transition: all 0.25s ease;
+}
+
+.btn-secondary:hover:not(.btn-disabled):not(.btn-loading) {
+  background: rgba(247, 147, 26, 0.1);
+  border-color: rgba(247, 147, 26, 0.6);
+  color: #f7931a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(247, 147, 26, 0.2);
+}
+
+.btn-secondary:active:not(.btn-disabled):not(.btn-loading) {
+  transform: translateY(0);
+  background: rgba(247, 147, 26, 0.15);
+}
+
+.btn-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.btn-loading {
+  opacity: 0.8;
+  cursor: wait;
+}
+
+.btn-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .btn {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    min-width: 100px;
+  }
+}

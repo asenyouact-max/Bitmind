@@ -1,0 +1,134 @@
+.top-miners-leaderboard {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border: 1px solid rgba(0, 195, 255, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.leaderboard-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(0, 195, 255, 0.2);
+}
+
+.leaderboard-icon {
+  font-size: 20px;
+  margin-right: 10px;
+}
+
+.leaderboard-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #00c3ff;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.leaderboard-empty {
+  padding: 20px;
+  text-align: center;
+}
+
+.leaderboard-empty .empty-text {
+  color: #666;
+  font-size: 14px;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  background: rgba(0, 195, 255, 0.05);
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.leaderboard-item:hover {
+  background: rgba(0, 195, 255, 0.1);
+  transform: translateX(4px);
+}
+
+.leaderboard-rank {
+  margin-right: 12px;
+}
+
+.rank-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.rank-1 {
+  background: linear-gradient(135deg, #ffd700 0%, #ffaa00 100%);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.rank-2 {
+  background: linear-gradient(135deg, #c0c0c0 0%, #a0a0a0 100%);
+  box-shadow: 0 0 8px rgba(192, 192, 192, 0.4);
+}
+
+.rank-3 {
+  background: linear-gradient(135deg, #cd7f32 0%, #a0522d 100%);
+  box-shadow: 0 0 6px rgba(205, 127, 50, 0.3);
+}
+
+.rank-badge:not(.rank-1):not(.rank-2):not(.rank-3) {
+  background: rgba(0, 195, 255, 0.2);
+  color: #00c3ff;
+}
+
+.leaderboard-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.leaderboard-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.leaderboard-hashrate {
+  font-size: 12px;
+  color: #00c3ff;
+  font-weight: 500;
+}
+
+.leaderboard-status {
+  margin-left: 12px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot.online {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.status-dot.offline {
+  background: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+}

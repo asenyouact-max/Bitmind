@@ -1,0 +1,30 @@
+# Bitmind Firewall Rules
+# UFW configuration for Ubuntu VPS
+# Apply with: sudo ufw allow from 100.0.0.0/8 to any port 8332 proto tcp
+
+# Default policies
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Allow SSH
+sudo ufw allow 22/tcp
+
+# Allow HTTP/HTTPS
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Allow backend API port (from anywhere)
+sudo ufw allow 3001/tcp
+
+# Allow Stratum port (from anywhere for miners)
+sudo ufw allow 3333/tcp
+
+# Allow Bitcoin Core RPC from Tailscale network ONLY
+# This restricts RPC access to Tailscale VPN only
+sudo ufw allow from 100.0.0.0/8 to any port 8332 proto tcp
+
+# Enable firewall
+sudo ufw enable
+
+# Show status
+sudo ufw status verbose
