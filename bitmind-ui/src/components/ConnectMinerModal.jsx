@@ -37,7 +37,7 @@ const ConnectMinerModal = ({ isOpen, onClose, onConnect }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("🚀 MODAL SUBMIT FIRED");
+    console.log("STEP 3 SUBMIT");
     alert("SUBMIT WORKS");
     setError('');
 
@@ -95,8 +95,12 @@ const ConnectMinerModal = ({ isOpen, onClose, onConnect }) => {
     });
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    console.log("MODAL NOT MOUNTING - isOpen is false");
+    return null;
+  }
 
+  console.log("MODAL MOUNTING - isOpen is true");
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>

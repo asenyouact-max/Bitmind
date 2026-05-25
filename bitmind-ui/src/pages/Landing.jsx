@@ -23,30 +23,31 @@ const Landing = ({ onConnect }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleConnectBitminer = () => {
-    console.log("🔥 CONNECT MINER BUTTON CLICKED");
+    console.log("STEP 1 BUTTON CLICK");
     alert("CLICK WORKS");
     // Open modal instead of direct connection
     setIsModalOpen(true);
+    console.log("STEP 2 MODAL OPEN");
   };
 
   const handleMinerConnect = async (formData) => {
     console.log('LANDING: handleMinerConnect called with formData:', formData);
-    
+
     try {
       // Connect WebSocket FIRST before registering miner
       // This ensures miner_connected event is received
       console.log('LANDING: Connecting WebSocket first...');
       await connect();
-      
+
       if (!isConnected) {
         console.warn('LANDING: WebSocket not connected, proceeding anyway');
       } else {
         console.log('LANDING: WebSocket connected successfully');
       }
-      
+
       const apiUrl = '/api/miners/connect'; // Use relative path for Nginx proxy
-      console.log('LANDING: Calling API at:', apiUrl);
-      
+      console.log('STEP 4 API REQUEST:', apiUrl);
+
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
@@ -60,9 +61,10 @@ const Landing = ({ onConnect }) => {
       console.log('LANDING: API response body:', result);
 
       if (result.success) {
+        console.log('STEP 5 API SUCCESS');
         console.log('LANDING: Miner connected successfully:', result.miner);
         setIsModalOpen(false);
-        
+
         // WebSocket is already connected, just navigate
         if (isConnected) {
           console.log('LANDING: Calling onConnect to navigate to dashboard');
