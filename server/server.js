@@ -35,10 +35,18 @@ global.wsServer = wsServer;
 
 // Handle WebSocket upgrade requests
 server.on('upgrade', (request, socket, head) => {
+  console.log("🔍 UPGRADE REQUEST:", request.url);
+  console.log("🔍 UPGRADE HEADERS:", request.headers);
+  
   if (request.url === '/ws') {
+    console.log("✅ WS UPGRADE ACCEPTED for /ws");
     wsServer.handleUpgrade(request, socket, head, (ws) => {
+      console.log("✅ WS CLIENT CONNECTED");
       wsServer.emit('connection', ws, request);
     });
+  } else {
+    console.log("❌ WS UPGRADE REJECTED - wrong path:", request.url);
+    socket.destroy();
   }
 });
 
@@ -125,7 +133,7 @@ process.on('uncaughtException', (err) => {
 
 // WebSocket connection handling
 wsServer.on('connection', (ws, req) => {
-  console.log('WS OPEN:', req.socket.remoteAddress);
+  console.log('✅ WS OPEN:', req.socket.remoteAddress);
   console.log("🟢 WS CONNECTED | clients:", wsServer.clients.size);
   
   // Initialize socket liveness tracking
@@ -188,7 +196,7 @@ wsServer.on('connection', (ws, req) => {
   
   // Handle disconnection using modular structure
   ws.on('close', (code, reason) => {
-    console.log(" WS CLOSED | code:", code, "reason:", reason);
+    console.log("❌ WS CLOSED | code:", code, "reason:", reason);
     console.log(" CLOSE DEVICE ID:", ws.deviceId || 'unknown');
     console.log(" AFTER CLOSE | clients:", wsServer.clients.size);
     
