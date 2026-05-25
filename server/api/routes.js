@@ -41,25 +41,6 @@ router.get('/miners', (req, res) => {
   }
 });
 
-// Devices endpoint - returns live device registry (legacy, deprecated)
-router.get('/devices', (req, res) => {
-  try {
-    const deviceList = state.getAllDevices();
-
-    res.json({
-      success: true,
-      count: deviceList.length,
-      devices: deviceList
-    });
-  } catch (error) {
-    console.error('Error getting API devices:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to get device list'
-    });
-  }
-});
-
 // Stats endpoint - computes from live state
 router.get('/stats', (req, res) => {
   try {
