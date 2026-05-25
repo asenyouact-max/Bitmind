@@ -11,7 +11,7 @@ class WebSocketService {
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectDelay = 3000;
-    this.url = import.meta.env.VITE_WS_URL || 'wss://getbitmind.com/ws';
+    this.url = window.location.protocol === 'https:' ? 'wss://' + window.location.host + '/ws' : 'ws://' + window.location.host + '/ws';
   }
 
   /**
@@ -197,7 +197,9 @@ export function connectWebSocket(onMessage) {
     return socket;
   }
 
-  socket = new WebSocket(import.meta.env.VITE_WS_URL || "wss://getbitmind.com/ws");
+  const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
+  socket = new WebSocket(wsUrl);
 
   socket.onopen = () => {
     console.log("WebSocket connected");

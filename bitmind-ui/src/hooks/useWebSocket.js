@@ -168,7 +168,7 @@ export const useWebSocket = () => {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/devices`);
+        const response = await fetch('/api/devices');
         if (response.ok) {
           const devices = await response.json();
           console.log('Devices loaded:', devices);
