@@ -32,7 +32,11 @@ const createDevice = (deviceId) => ({
   websocketState: "disconnected", // connected | disconnected | error
   lastDisconnectReason: null,
   // Worker identity fields
-  workerName: null // Primary display identity
+  workerName: null, // Primary display identity
+  // Onboarding fields
+  walletAddress: null,
+  deviceType: null,
+  miningMode: null
 });
 
 // STATE MUTATION FUNCTIONS - ONLY THESE CAN MODIFY STATE
@@ -41,6 +45,12 @@ const mutations = {
   createDevice: (deviceId) => {
     const device = createDevice(deviceId);
     state.devices.set(deviceId, device);
+    updateSystemStats();
+    return device;
+  },
+
+  addDevice: (device) => {
+    state.devices.set(device.deviceId, device);
     updateSystemStats();
     return device;
   },

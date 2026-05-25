@@ -1,7 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import Button from '../components/ui/Button';
+import ConnectMinerModal from '../components/ConnectMinerModal';
 import './Landing.css';
+
+// Debug flag
+if (typeof window !== 'undefined') {
+  window.__BITMIND_DEBUG = true;
+}
 
 /**
  * Landing Page
@@ -9,17 +15,67 @@ import './Landing.css';
  * Shows connection options and WebSocket status
  */
 const Landing = ({ onConnect }) => {
-  const { status, connect, isConnected } = useWebSocket();
+  // Runtime injection - MUST execute immediately
+  console.log("🔥 BITMIND FRONTEND EXECUTING");
+  window.__BITMIND_RUNTIME = true;
 
-  const handleConnectBitminer = async () => {
+  const { status, connect, isConnected } = useWebSocket();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleConnectBitminer = () => {
+    console.log("🔥 CONNECT MINER BUTTON CLICKED");
+    alert("CLICK WORKS");
+    // Open modal instead of direct connection
+    setIsModalOpen(true);
+  };
+
+  const handleMinerConnect = async (formData) => {
+    console.log('LANDING: handleMinerConnect called with formData:', formData);
+    
     try {
+      // Connect WebSocket FIRST before registering miner
+      // This ensures miner_connected event is received
+      console.log('LANDING: Connecting WebSocket first...');
       await connect();
-      // Parent component will handle navigation based on isConnected change
-      if (isConnected) {
-        onConnect();
+      
+      if (!isConnected) {
+        console.warn('LANDING: WebSocket not connected, proceeding anyway');
+      } else {
+        console.log('LANDING: WebSocket connected successfully');
+      }
+      
+      const apiUrl = '/api/miners/connect'; // Use relative path for Nginx proxy
+      console.log('LANDING: Calling API at:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+
+      console.log('LANDING: API response status:', response.status);
+      const result = await response.json();
+      console.log('LANDING: API response body:', result);
+
+      if (result.success) {
+        console.log('LANDING: Miner connected successfully:', result.miner);
+        setIsModalOpen(false);
+        
+        // WebSocket is already connected, just navigate
+        if (isConnected) {
+          console.log('LANDING: Calling onConnect to navigate to dashboard');
+          onConnect();
+        } else {
+          console.warn('LANDING: WebSocket still not connected after miner registration');
+        }
+      } else {
+        throw new Error(result.error || 'Failed to connect miner');
       }
     } catch (error) {
-      console.error('Failed to connect:', error);
+      console.error('LANDING: Failed to connect miner:', error);
+      throw error;
     }
   };
 
@@ -93,6 +149,13 @@ const Landing = ({ onConnect }) => {
           <p>Advanced Bitcoin Mining Pool Dashboard</p>
         </div>
       </div>
+
+      {/* Connect Miner Modal */}
+      <ConnectMinerModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConnect={handleMinerConnect}
+      />
     </div>
   );
 };

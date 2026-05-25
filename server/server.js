@@ -13,6 +13,7 @@ const wsHandlers = require('./ws/handlers');
 const apiRoutes = require('./api/routes');
 const miningServices = require('./services/mining');
 const coreUtils = require('./core/utils');
+const { startWatchdog } = require('./core/watchdog');
 
 const app = express();
 const server = http.createServer(app);
@@ -1401,7 +1402,13 @@ async function startServer() {
     // Step 5: Start websocket watchdog
     startWebSocketWatchdog();
     
-    // Step 6: Final system ready check
+    // Step 6: Start system watchdog (auto-recovery)
+    console.log(`[SYSTEM] Starting system watchdog for auto-recovery...`);
+    global.watchdog = { startWatchdog, getStatus: () => startWatchdog.getStatus() };
+    startWatchdog();
+    console.log(`[SYSTEM] ✅ System watchdog started`);
+    
+    // Step 7: Final system ready check
     console.log(`[SYSTEM] ========================================`);
     console.log(`[SYSTEM] Bitmind backend is READY!`);
     console.log(`[SYSTEM] ========================================`);
@@ -1409,6 +1416,10 @@ async function startServer() {
     console.log(`[SYSTEM] Stratum: 0.0.0.0:${STRATUM_PORT}`);
     console.log(`[SYSTEM] Bitcoin: Connected`);
     console.log(`[SYSTEM] Miners can now connect to 192.168.1.12:${STRATUM_PORT}`);
+    console.log(`[SYSTEM] System status: http://0.0.0.0:${PORT}/api/system/status`);
+    console.log(`[SYSTEM] Health check: http://0.0.0.0:${PORT}/health`);
+    console.log(`[SYSTEM] ========================================`);
+    console.log(`[SYSTEM] ${new Date().toISOString()} - Process ID: ${process.pid}`);
     console.log(`[SYSTEM] ========================================`);
 
     isStarted = true;

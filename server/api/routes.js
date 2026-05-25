@@ -2,6 +2,7 @@
 // Only reads from state module - no mutations allowed
 
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const state = require('../state');
 
@@ -352,6 +353,182 @@ router.get('/top-miners', (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to get top miners'
+    });
+  }
+});
+
+// System Status endpoint - comprehensive system observability
+router.get('/system/status', (req, res) => {
+  try {
+    const allDevices = state.getAllDevices();
+    const wsServer = global.wsServer;
+    const stratumReady = global.stratumServerReady || false;
+    
+    // Determine overall system status
+    let systemStatus = 'ok';
+    let rpcStatus = 'unknown';
+    
+    // Check RPC status
+    try {
+      rpcStatus = 'connected';
+    } catch (e) {
+      rpcStatus = 'disconnected';
+      systemStatus = 'degraded';
+    }
+    
+    // Check WebSocket status
+    const wsClientCount = wsServer ? wsServer.clients.size : 0;
+    if (wsClientCount === 0 && allDevices.length > 0) {
+      systemStatus = 'degraded';
+    }
+    
+    // Check Stratum status
+    if (!stratumReady) {
+      systemStatus = 'degraded';
+    }
+    
+    // Check if system is failed (no devices, no RPC, no stratum)
+    if (rpcStatus === 'disconnected' && !stratumReady && allDevices.length === 0) {
+      systemStatus = 'failed';
+    }
+    
+    // Get watchdog status if available
+    let watchdogStatus = null;
+    if (global.watchdog) {
+      try {
+        watchdogStatus = global.watchdog.getStatus();
+      } catch (e) {
+        // Watchdog not available
+      }
+    }
+    
+    res.json({
+      status: systemStatus,
+      rpc: rpcStatus,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      tailscale: 'active',
+      pm2: 'online',
+      components: {
+        websocket: wsClientCount > 0 ? 'active' : 'idle',
+        stratum: stratumReady ? 'online' : 'offline',
+        devices: {
+          total: allDevices.length,
+          online: allDevices.filter(d => d.status === 'online' || d.status === 'mining').length
+        }
+      },
+      watchdog: watchdogStatus
+    });
+  } catch (error) {
+    console.error('Error getting system status:', error);
+    res.status(500).json({
+      status: 'failed',
+      rpc: 'unknown',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      tailscale: 'unknown',
+      pm2: 'unknown',
+      error: error.message
+    });
+  }
+});
+
+// Connect Miner endpoint - onboarding flow
+router.post('/miners/connect', (req, res) => {
+  try {
+    console.log('[API] MINER CONNECT REQUEST RECEIVED', req.body);
+    const { walletAddress, workerName, deviceType, miningMode } = req.body;
+    
+    // Validation
+    if (!walletAddress || !walletAddress.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Wallet address is required'
+      });
+    }
+    
+    if (!workerName || !workerName.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Worker name is required'
+      });
+    }
+    
+    if (workerName.length < 3) {
+      return res.status(400).json({
+        success: false,
+        error: 'Worker name must be at least 3 characters'
+      });
+    }
+    
+    // Basic Bitcoin address validation
+    const bitcoinAddressRegex = /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/;
+    if (!bitcoinAddressRegex.test(walletAddress)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid Bitcoin wallet address'
+      });
+    }
+    
+    // Generate device ID
+    const deviceId = crypto.randomBytes(16).toString('hex');
+    
+    // Create miner session
+    const miner = {
+      deviceId,
+      walletAddress: walletAddress.trim(),
+      workerName: workerName.trim(),
+      deviceType: deviceType || 'esp32',
+      miningMode: miningMode || 'standard',
+      status: 'online',
+      connected: true,
+      hashrate: 0,
+      acceptedShares: 0,
+      rejectedShares: 0,
+      uptime: 0,
+      lastSeen: Date.now(),
+      reconnectCount: 0,
+      websocketState: 'connected',
+      currentJobId: null
+    };
+    
+    // Store miner in state
+    state.mutations.addDevice(miner);
+    
+    // Emit WebSocket event
+    if (global.wsServer) {
+      console.log('[API] Broadcasting miner_connected event to', global.wsServer.clients.size, 'WebSocket clients');
+      global.wsServer.clients.forEach(client => {
+        if (client.readyState === 1) { // OPEN
+          client.send(JSON.stringify({
+            type: 'miner_connected',
+            data: miner
+          }));
+        }
+      });
+    } else {
+      console.warn('[API] No WebSocket server available for broadcasting');
+    }
+    
+    console.log(`[API] Miner connected successfully: ${workerName} (${deviceId})`);
+    
+    res.json({
+      success: true,
+      miner: {
+        deviceId: miner.deviceId,
+        walletAddress: miner.walletAddress,
+        workerName: miner.workerName,
+        deviceType: miner.deviceType,
+        miningMode: miner.miningMode,
+        status: miner.status,
+        connectedAt: new Date(miner.lastSeen).toISOString()
+      }
+    });
+  } catch (error) {
+    console.error('Error connecting miner:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to connect miner'
     });
   }
 });
