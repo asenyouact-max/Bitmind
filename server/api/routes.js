@@ -22,11 +22,30 @@ function formatUptime(seconds) {
   return `${hours}h ${minutes}m`;
 }
 
-// Devices endpoint - returns live device registry
+// Miners endpoint - returns live miner registry (unified API)
+router.get('/miners', (req, res) => {
+  try {
+    const minerList = state.getAllDevices();
+
+    res.json({
+      success: true,
+      count: minerList.length,
+      miners: minerList
+    });
+  } catch (error) {
+    console.error('Error getting API miners:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get miner list'
+    });
+  }
+});
+
+// Devices endpoint - returns live device registry (legacy, deprecated)
 router.get('/devices', (req, res) => {
   try {
     const deviceList = state.getAllDevices();
-    
+
     res.json({
       success: true,
       count: deviceList.length,

@@ -168,17 +168,17 @@ export const useWebSocket = () => {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch('/api/devices');
+        const response = await fetch('/api/miners');
         if (response.ok) {
           const devices = await response.json();
-          console.log('Devices loaded:', devices);
+          console.log('Miners loaded:', devices);
         }
       } catch (error) {
-        console.error('Failed to fetch device data:', error);
+        console.error('Failed to fetch miner data:', error);
       }
     };
 
-    // Fetch device data on component mount
+    // Fetch miner data on component mount
     fetchDevices();
   }, []);
 
