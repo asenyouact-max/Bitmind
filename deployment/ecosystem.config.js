@@ -2,34 +2,29 @@ module.exports = {
   apps: [{
     name: 'bitmind',
     script: './server/server.js',
-    cwd: './',
+    cwd: '/opt/Bitmind',
     instances: 1,
     exec_mode: 'fork',
     autorestart: true,
     watch: false,
-    max_memory_restart: '1G',
-    restart_delay: 5000,
-    max_restarts: 15,
-    min_uptime: '10s',
+    max_memory_restart: '512M',
+    restart_delay: 3000,
+    max_restarts: 10,
+    min_uptime: '5s',
     env: {
       NODE_ENV: 'production',
-      PORT: process.env.PORT || 3001,
-      STRATUM_PORT: process.env.STRATUM_PORT || 3333,
-      RPC_HOST: process.env.RPC_HOST,
-      RPC_PORT: process.env.RPC_PORT || 8332,
-      RPC_USER: process.env.RPC_USER || 'Global',
-      RPC_PASSWORD: process.env.RPC_PASSWORD,
-      RPC_URL: process.env.RPC_URL,
-      COINBASE_ADDRESS: process.env.COINBASE_ADDRESS,
-      RPC_TIMEOUT: process.env.RPC_TIMEOUT || 30000
+      PORT: 3001,
+      STRATUM_PORT: 3333,
+      RPC_HOST: '127.0.0.1',
+      RPC_PORT: 8332,
+      RPC_USER: 'Global',
+      RPC_PASSWORD: 'BITMIND400K@Hot$$$'
     },
-    error_file: './logs/bitmind-error.log',
-    out_file: './logs/bitmind-out.log',
+    error_file: '/opt/Bitmind/logs/bitmind-error.log',
+    out_file: '/opt/Bitmind/logs/bitmind-out.log',
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
     merge_logs: true,
     time: true,
-    kill_timeout: 5000,
-    wait_ready: true,
-    listen_timeout: 10000
+    kill_timeout: 5000
   }]
 };

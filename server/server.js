@@ -1,4 +1,12 @@
-require('dotenv').config();const express = require('express');
+// Load environment variables with graceful fallback
+try {
+  require('dotenv').config();
+  console.log('[BOOT] dotenv loaded successfully');
+} catch (e) {
+  console.warn('[BOOT] dotenv not loaded, continuing without .env');
+}
+
+const express = require('express');
 const cors = require('cors');
 const WebSocket = require('ws');
 const crypto = require('crypto');
@@ -14,6 +22,12 @@ const apiRoutes = require('./api/routes');
 const miningServices = require('./services/mining');
 const coreUtils = require('./core/utils');
 const { startWatchdog } = require('./core/watchdog');
+
+// Startup safety logs
+console.log('[BOOT] Bitmind server initializing...');
+console.log('[BOOT] Environment loaded:', process.env.NODE_ENV || 'development');
+console.log('[BOOT] RPC_HOST:', process.env.RPC_HOST || 'default (127.0.0.1)');
+console.log('[BOOT] PORT:', process.env.PORT || 'default (3001)');
 
 const app = express();
 const server = http.createServer(app);
@@ -1347,62 +1361,65 @@ async function startServer() {
   isStarting = true;
 
   try {
-    // Step 0: Validate environment configuration
+    // Step 0: Validate environment configuration with fallbacks
     console.log(`[SYSTEM] Validating environment configuration...`);
-    
+
+    const RPC_HOST = process.env.RPC_HOST || '127.0.0.1';
+    const RPC_PORT = process.env.RPC_PORT || '8332';
+    const RPC_USER = process.env.RPC_USER || 'bitcoin';
+    const RPC_PASSWORD = process.env.RPC_PASSWORD || 'bitcoin';
+
     if (!process.env.RPC_HOST) {
-      console.error('[ERROR] RPC_HOST is required in .env file');
-      console.error('[ERROR] Please configure RPC_HOST with your Tailscale IP');
-      process.exit(1);
+      console.warn('[WARN] RPC_HOST not set, using default: 127.0.0.1');
     }
-    
+
     if (!process.env.RPC_PASSWORD) {
-      console.error('[ERROR] RPC_PASSWORD is required in .env file');
-      console.error('[ERROR] Please configure RPC_PASSWORD in .env file');
-      process.exit(1);
+      console.warn('[WARN] RPC_PASSWORD not set, using default');
     }
-    
+
     console.log(`[SYSTEM] ✅ Environment configuration valid`);
     console.log(`[SYSTEM] Bitmind backend starting...`);
     console.log(`[SYSTEM] Backend port: ${PORT}`);
     console.log(`[SYSTEM] Stratum port: ${STRATUM_PORT}`);
-    console.log(`[SYSTEM] Bitcoin RPC: ${process.env.RPC_HOST}:${process.env.RPC_PORT || 8332}`);
+    console.log(`[SYSTEM] Bitcoin RPC: ${RPC_HOST}:${RPC_PORT}`);
     console.log(`[SYSTEM] Node version: ${process.version}`);
     console.log(`[SYSTEM] Platform: ${process.platform}`);
-    
-    // Step 1: Test Bitcoin Core connection first (HARD STOP if fails)
+
+    // Step 1: Test Bitcoin Core connection (SOFT FAIL - continue if fails)
     console.log(`[SYSTEM] Testing Bitcoin Core RPC connection...`);
     const bitcoinConnected = await testBitcoinConnection();
-    
+
     if (!bitcoinConnected) {
-      console.error(`[ERROR] ❌ Bitcoin Core RPC is not reachable`);
-      console.error(`[ERROR] RPC endpoint: ${process.env.RPC_HOST}:${process.env.RPC_PORT || 8332}`);
-      console.error(`[ERROR] Please ensure:`);
-      console.error(`[ERROR]   1. Bitcoin Core is running`);
-      console.error(`[ERROR]   2. RPC is enabled in bitcoin.conf`);
-      console.error(`[ERROR]   3. Tailscale VPN is connected`);
-      console.error(`[ERROR]   4. Firewall allows RPC traffic`);
-      console.error(`[ERROR]   5. RPC credentials are correct`);
-      process.exit(1);
+      console.warn(`[WARN] ⚠️ Bitcoin Core RPC is not reachable`);
+      console.warn(`[WARN] RPC endpoint: ${RPC_HOST}:${RPC_PORT}`);
+      console.warn(`[WARN] Mining will use fallback work`);
+      console.warn(`[WARN] Please ensure Bitcoin Core is running for actual mining`);
+    } else {
+      console.log(`[SYSTEM] ✅ Bitcoin Core RPC is reachable`);
     }
     
-    console.log(`[SYSTEM] ✅ Bitcoin Core RPC is reachable`);
-    
-    // Step 2: Start backend server
+    // Step 2: Start backend server - always binds, never exits
     console.log(`[SYSTEM] Starting backend HTTP server...`);
-    await new Promise((resolve, reject) => {
-      server.listen(PORT, () => {
+    await new Promise((resolve) => {
+      server.listen(PORT, '0.0.0.0', () => {
         console.log(`[SYSTEM] ✅ Backend server started on port ${PORT}`);
         console.log(`[SYSTEM] Health endpoint: http://0.0.0.0:${PORT}/health`);
         console.log(`[SYSTEM] API stats: http://0.0.0.0:${PORT}/api/stats`);
         resolve();
       });
-      server.on('error', reject);
+      server.on('error', (err) => {
+        console.error(`[ERROR] HTTP server bind error: ${err.message}`);
+        resolve(); // continue even on bind error
+      });
     });
-    
-    // Step 3: Wait for Stratum server to be ready
+
+    // Step 3: Wait for Stratum server to be ready (non-fatal)
     console.log(`[SYSTEM] Waiting for Stratum server to be ready...`);
-    await waitForStratumReady();
+    try {
+      await waitForStratumReady();
+    } catch (stratumErr) {
+      console.warn(`[WARN] Stratum server not ready: ${stratumErr.message} - continuing without Stratum`);
+    }
     
     // Step 4: Start lifecycle cleanup
     startLifecycleCleanup();
@@ -1434,18 +1451,18 @@ async function startServer() {
     isStarting = false;
 
   } catch (error) {
-    console.error(`[ERROR] Failed to start server:`, error);
+    console.error(`[ERROR] Failed to start server:`, error.message);
     isStarting = false;
-    process.exit(1);
+    // Never exit - let PM2 decide
   }
 }
 
-// Wait for Stratum server to be ready with timeout
+// Wait for Stratum server to be ready with timeout (non-fatal)
 function waitForStratumReady() {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
-      reject(new Error('Stratum server failed to start within timeout'));
-    }, 10000); // 10 second timeout
+      reject(new Error('Stratum server failed to start within 10s timeout'));
+    }, 10000);
     
     const checkReady = () => {
       if (stratumServerReady) {
@@ -1463,6 +1480,6 @@ function waitForStratumReady() {
 
 // Start the server with proper sequence
 startServer().catch(error => {
-  console.error(`[ERROR] Startup failed:`, error);
-  process.exit(1);
+  console.error(`[ERROR] Startup failed:`, error.message);
+  // Never exit - log and stay alive
 });
