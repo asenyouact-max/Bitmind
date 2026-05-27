@@ -74,13 +74,20 @@ fi
 cp "$CANONICAL_CONFIG" "$TARGET_CONFIG"
 echo -e "${GREEN}✓ Canonical config deployed to $TARGET_CONFIG${NC}"
 
-# ── STEP 5: Enable canonical config ───────────────
-echo "[5/6] Enabling canonical config..."
-ln -sf "$TARGET_CONFIG" "$NGINX_SITES_ENABLED/getbitmind.com"
-echo -e "${GREEN}✓ Canonical config enabled${NC}"
+# ── STEP 5: HARD CLEAN - remove ALL from sites-enabled ──
+echo "[5/7] HARD CLEAN: removing all configs from sites-enabled..."
+echo "  Current getbitmind.com references:"
+grep -R "getbitmind.com" /etc/nginx/sites-enabled /etc/nginx/sites-available 2>/dev/null || echo "  (none found)"
+rm -f /etc/nginx/sites-enabled/*
+echo -e "${GREEN}✓ All configs removed from sites-enabled${NC}"
 
-# ── STEP 6: Test and reload nginx ────────────────
-echo "[6/6] Testing nginx configuration..."
+# ── STEP 6: Enable ONLY canonical config ──────────
+echo "[6/7] Enabling ONLY canonical config..."
+ln -sf "$TARGET_CONFIG" "$NGINX_SITES_ENABLED/getbitmind.com"
+echo -e "${GREEN}✓ Canonical config enabled (only config in sites-enabled)${NC}"
+
+# ── STEP 7: Test and reload nginx ────────────────
+echo "[7/7] Testing nginx configuration..."
 if nginx -t; then
     echo -e "${GREEN}✓ nginx configuration test passed${NC}"
     echo "Reloading nginx..."
