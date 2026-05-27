@@ -51,15 +51,15 @@ export const useWebSocket = () => {
   const handleMessage = useCallback((message) => {
     console.log('WebSocket message in hook:', message);
 
-    // STRICT MESSAGE TYPE HANDLING - Only allow device-related messages
-    if (message.type === 'devices' || message.type === 'device_update') {
-      console.log('Device message received:', message.type);
-      
+    // STRICT MESSAGE TYPE HANDLING - Only allow miner-related messages
+    if (message.type === 'miners' || message.type === 'miner_update' || message.type === 'miner_connected') {
+      console.log('Miner message received:', message.type);
+
       if (handlersRef.current.onMessage) {
         handlersRef.current.onMessage(message);
       }
     } else {
-      console.log('Ignoring non-device message type:', message.type);
+      console.log('Ignoring non-miner message type:', message.type);
       // Safely ignore all other message types
     }
   }, []);
