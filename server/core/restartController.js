@@ -154,13 +154,10 @@ function triggerRestart(reason) {
   log(`Restart reason: ${reason}`, 'WARN');
   log(`Final state - RPC failures: ${consecutiveRpcFailures}, Health failures: ${consecutiveHealthFailures}`, 'WARN');
   
-  // Trigger graceful shutdown via PM2
-  setTimeout(() => {
-    log('Sending SIGTERM to PM2 for restart', 'WARN');
-    process.exit(1); // PM2 will restart
-  }, 1000);
+  // DISABLED: process.exit(1) - let PM2 manage restarts externally
+  // The server stays alive even if RPC/health fails - logs only
   
-  return { success: true, reason: 'restart_initiated' };
+  return { success: true, reason: 'restart_disabled_crash_free' };
 }
 
 /**

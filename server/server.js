@@ -233,162 +233,8 @@ wsServer.on('connection', (ws, req) => {
 
 // NOTE: Old keepalive system removed - replaced by startWebSocketWatchdog()
 
-// Bitcoin Core RPC configuration
-const RPC_URL = process.env.RPC_URL || 'http://127.0.0.1:8332';
-const RPC_USER = process.env.RPC_USER || 'bitcoin';
-const RPC_PASSWORD = process.env.RPC_PASSWORD || '123456';
-
-// RPC client with authentication
-const rpcClient = axios.create({
-  baseURL: RPC_URL,
-  auth: {
-    username: RPC_USER,
-    password: RPC_PASSWORD
-  },
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Bitcoin Core RPC functions
-async function callRpc(method, params = []) {
-  try {
-    console.log(`Calling RPC method: ${method} with params:`, params);
-    const response = await rpcClient.post('', {
-      "jsonrpc": "1.0",
-      "id": "bitmind",
-      "method": method,
-      "params": params
-    });
-    console.log(`RPC ${method} successful:`, response.data.result);
-    return response.data.result;
-  } catch (error) {
-    console.error(`RPC ${method} failed:`, error.message);
-    
-    // Specific handling for connection errors
-    if (error.code === 'ECONNREFUSED') {
-      console.error('Connection refused - Bitcoin Core is not running or RPC is not enabled');
-      console.error('Please ensure:');
-      console.error('1. Bitcoin Core is running');
-      console.error('2. server=1 is set in bitcoin.conf');
-      console.error('3. rpcport=8332 is set in bitcoin.conf');
-      console.error('4. Bitcoin Core has been restarted after config changes');
-    }
-    
-    if (error.response) {
-      console.error('RPC Error Response:', error.response.data);
-    }
-    throw error;
-  }
-}
-
-// Test Bitcoin Core connection
-async function testBitcoinConnection() {
-  try {
-    const blockchainInfo = await callRpc('getblockchaininfo');
-    console.log('Bitcoin Core connection successful!');
-    console.log('Chain:', blockchainInfo.chain);
-    console.log('Blocks:', blockchainInfo.blocks);
-    return true;
-  } catch (error) {
-    console.error('Bitcoin Core connection failed:', error.message);
-    return false;
-  }
-}
-
-// Get block template for mining - FIXED VERSION
-async function getBlockTemplate(maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`[mining] Getting block template from Bitcoin Core... (attempt ${attempt}/${maxRetries})`);
-      
-      // FIXED: Correct JSON-RPC format with proper params structure
-      const response = await rpcClient.post('', {
-        "jsonrpc": "1.0",
-        "id": "solominer",
-        "method": "getblocktemplate",
-        "params": [{
-          "rules": ["segwit"]
-        }]
-      });
-      
-      // FIXED: Log full response and success message
-      if (response.data && response.data.result) {
-        console.log('[mining] getblocktemplate success');
-        console.log('Template keys:', Object.keys(response.data.result));
-        return response.data.result;
-      } else {
-        console.error('getblocktemplate failed - Invalid response structure');
-        throw new Error('Invalid response from Bitcoin Core');
-      }
-      
-    } catch (error) {
-      // FIXED: Enhanced error logging with full response details
-      console.error(`[mining] getblocktemplate failed: ${error.message}`);
-      
-      if (error.response) {
-        console.error('Status Code:', error.response.status);
-        console.error('Response Data:', JSON.stringify(error.response.data, null, 2));
-        
-        // FIXED: Check if node is still syncing
-        if (error.response.data?.error?.message) {
-          const errorMsg = error.response.data.error.message.toLowerCase();
-          if (errorMsg.includes('sync') || errorMsg.includes('loading') || errorMsg.includes('initial') || errorMsg.includes('initializing') || errorMsg.includes('ibd')) {
-            console.log('[mining] Bitcoin Core is still syncing (IBD mode)');
-            if (attempt < maxRetries) {
-              console.log(`[mining] Retrying in 5 seconds...`);
-              await new Promise(resolve => setTimeout(resolve, 5000));
-              continue;
-            }
-            throw new Error('[mining] Bitcoin Core is still syncing - cannot generate block templates during IBD');
-          }
-        }
-        
-        // FIXED: Handle specific Bitcoin Core errors
-        if (error.response.data?.error?.code === -28) {
-          console.log('[mining] Bitcoin Core is still warming up');
-          if (attempt < maxRetries) {
-            console.log(`[mining] Retrying in 5 seconds...`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            continue;
-          }
-          throw new Error('[mining] Bitcoin Core is still warming up');
-        }
-        
-        if (error.response.data?.error?.code === -1) {
-          console.error('[mining] Invalid parameters for getblocktemplate');
-          throw new Error('[mining] Invalid parameters for getblocktemplate');
-        }
-        
-        // FIXED: Handle 500 errors specifically - likely IBD related
-        if (error.response.status === 500) {
-          console.log('[mining] HTTP 500 - Bitcoin Core is likely still syncing (IBD mode)');
-          console.log('[mining] getblocktemplate is not available during initial block download');
-          
-          if (attempt < maxRetries) {
-            console.log(`[mining] Retrying in 5 seconds...`);
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            continue;
-          }
-          throw new Error('[mining] getblocktemplate failed - Bitcoin Core is still syncing (IBD mode)');
-        }
-      }
-      
-      // FIXED: Handle connection refused
-      if (error.code === 'ECONNREFUSED') {
-        console.error('[mining] Connection refused - Bitcoin Core RPC is not available');
-        throw new Error('[mining] Connection refused - Bitcoin Core RPC is not available');
-      }
-      
-      if (attempt < maxRetries) {
-        console.log(`[mining] Retrying in 5 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-      } else {
-        throw error;
-      }
-    }
-  }
-}
+// NOTE: RPC functions removed - using rpcService from services/rpc.js instead
+// This ensures ENV-based configuration and proper error handling
 
 // CORS configuration - support both development and production
 app.use(cors({
@@ -448,7 +294,7 @@ app.get('/health/full', async (req, res) => {
 // Sync status endpoint
 app.get('/sync/status', async (req, res) => {
   try {
-    const blockchainInfo = await callRpc('getblockchaininfo');
+    const blockchainInfo = await rpcService.getBlockchainInfo();
     const progress = blockchainInfo.verificationprogress || 0;
     
     res.json({
@@ -469,7 +315,7 @@ app.get('/sync/status', async (req, res) => {
 // Legacy sync endpoint (keep for compatibility)
 app.get('/sync', async (req, res) => {
   try {
-    const blockchainInfo = await callRpc('getblockchaininfo');
+    const blockchainInfo = await rpcService.getBlockchainInfo();
     const progress = blockchainInfo.verificationprogress || 0;
     const progressPercent = Math.round(progress * 100);
     const isSynced = progress >= 0.999 && !blockchainInfo.initialblockdownload;
@@ -495,7 +341,7 @@ app.get('/sync', async (req, res) => {
 app.get('/debug/rpc', async (req, res) => {
   console.log('RPC debug endpoint requested from:', req.ip);
   try {
-    const result = await getBlockTemplate();
+    const result = await rpcService.getBlockTemplate();
     res.json({
       status: 'success',
       message: 'getblocktemplate successful',
@@ -1244,7 +1090,7 @@ function handleSubmit(miner, data) {
 async function sendWork(miner) {
   try {
     console.log(`[mining] Getting work for miner ${miner.id} from Bitcoin Core...`);
-    const template = await getBlockTemplate();
+    const template = await rpcService.getBlockTemplate();
     
     // Convert block template to stratum work format
     const jobId = crypto.randomBytes(8).toString('hex');
@@ -1387,7 +1233,7 @@ async function startServer() {
 
     // Step 1: Test Bitcoin Core connection (SOFT FAIL - continue if fails)
     console.log(`[SYSTEM] Testing Bitcoin Core RPC connection...`);
-    const bitcoinConnected = await testBitcoinConnection();
+    const bitcoinConnected = await rpcService.testConnection();
 
     if (!bitcoinConnected) {
       console.warn(`[WARN] ⚠️ Bitcoin Core RPC is not reachable`);

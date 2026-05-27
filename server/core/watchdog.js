@@ -144,14 +144,11 @@ function triggerRestart(reason) {
   recordRestart(reason);
   
   // Log final state before restart
-  log('Initiating controlled restart...', 'WARN');
+  log('Restart would be triggered, but disabled for crash-free operation', 'WARN');
   log(`Final state - RPC failures: ${consecutiveRpcFailures}, Health failures: ${consecutiveHealthFailures}`);
   
-  // Trigger graceful shutdown via PM2
-  setTimeout(() => {
-    log('Sending SIGTERM to PM2 for restart', 'WARN');
-    process.exit(1); // PM2 will restart
-  }, 1000);
+  // DISABLED: process.exit(1) - let PM2 manage restarts externally
+  // The server stays alive even if RPC/health fails - logs only
 }
 
 /**
