@@ -69,35 +69,46 @@ router.get('/stats', (req, res) => {
 });
 
 // Health endpoint - system status with defensive null checks
-router.get('/health', (req, res) => {
+router.get('/health', async (req, res) => {
   try {
     // Defensive null checks for all system components
     const systemStats = state.getSystemStats() || { uptime: 0, connectedMiners: 0, totalHashrate: 0 };
     const wsServer = global.wsServer;
     const stratumReady = global.stratumServerReady || false;
-    
+
     // Calculate actual uptime from process if systemStats.uptime is not a duration
-    const uptime = typeof systemStats.uptime === 'number' && systemStats.uptime > 1000000000000 
-      ? Date.now() - systemStats.uptime 
+    const uptime = typeof systemStats.uptime === 'number' && systemStats.uptime > 1000000000000
+      ? Date.now() - systemStats.uptime
       : process.uptime();
-    
+
     // Get WebSocket client count safely
     const wsClientCount = wsServer ? wsServer.clients.size : 0;
-    
-    // Determine Bitcoin RPC status (fallback mode if unavailable)
+
+    // Determine Bitcoin RPC status - ACTUAL TEST
     let bitcoinRpcStatus = 'unknown';
-    try {
-      bitcoinRpcStatus = 'connected';
-    } catch (e) {
-      bitcoinRpcStatus = 'fallback';
+    let rpcConfigured = false;
+
+    // Check if RPC is configured
+    if (process.env.RPC_HOST && process.env.RPC_USER && process.env.RPC_PASSWORD) {
+      rpcConfigured = true;
+      try {
+        const { rpcService } = require('../services/rpc');
+        const connected = await rpcService.testConnection();
+        bitcoinRpcStatus = connected ? 'connected' : 'disconnected';
+      } catch (e) {
+        bitcoinRpcStatus = 'error';
+      }
+    } else {
+      bitcoinRpcStatus = 'not_configured';
     }
-    
+
     res.json({
       status: 'ok',
       uptime: Math.floor(uptime),
       websocket_clients: wsClientCount,
       stratum_status: stratumReady ? 'online' : 'offline',
       bitcoin_rpc_status: bitcoinRpcStatus,
+      rpc_configured: rpcConfigured,
       timestamp: new Date().toISOString()
     });
   } catch (error) {

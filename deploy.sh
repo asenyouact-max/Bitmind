@@ -30,12 +30,17 @@ if [ ! -f "$REPO_DIR/.env" ]; then
   cat > "$REPO_DIR/.env" << 'ENVEOF'
 PORT=3001
 STRATUM_PORT=3333
-RPC_HOST=127.0.0.1
+# RPC Configuration - MUST BE CONFIGURED FOR PRODUCTION
+# RPC_HOST should be Tailscale IP of Bitcoin Core laptop (100.x.x.x)
+RPC_HOST=
 RPC_PORT=8332
-RPC_USER=Global
-RPC_PASSWORD=BITMIND400K@Hot$$$
+RPC_USER=
+RPC_PASSWORD=
+RPC_TIMEOUT=30000
 ENVEOF
-  echo -e "${YELLOW}⚠ Created default .env (update RPC_HOST for Tailscale)${NC}"
+  echo -e "${RED}✗ .env created but RPC_HOST/RPC_USER/RPC_PASSWORD must be configured${NC}"
+  echo -e "${RED}✗ Edit /opt/Bitmind/.env and set RPC configuration before proceeding${NC}"
+  exit 1
 else
   echo -e "${GREEN}✓ .env exists${NC}"
 fi

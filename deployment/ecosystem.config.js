@@ -14,11 +14,9 @@ module.exports = {
     env: {
       NODE_ENV: 'production',
       PORT: 3001,
-      STRATUM_PORT: 3333,
-      RPC_HOST: '127.0.0.1',
-      RPC_PORT: 8332,
-      RPC_USER: 'Global',
-      RPC_PASSWORD: 'BITMIND400K@Hot$$$'
+      STRATUM_PORT: 3333
+      // RPC_* variables must be set in /opt/Bitmind/.env file
+      // DO NOT hardcode secrets here - they should come from .env
     },
     error_file: '/opt/Bitmind/logs/bitmind-error.log',
     out_file: '/opt/Bitmind/logs/bitmind-out.log',

@@ -7,13 +7,21 @@ const axios = require('axios');
 
 class RPCService {
   constructor() {
+    // Production: RPC_HOST, RPC_USER, RPC_PASSWORD MUST be set in .env
+    // No fallbacks - configuration is explicit
     this.config = {
-      host: process.env.RPC_HOST || '127.0.0.1',
-      port: process.env.RPC_PORT || 8332,
-      user: process.env.RPC_USER || 'Global',
-      password: process.env.RPC_PASSWORD || '',
+      host: process.env.RPC_HOST,
+      port: parseInt(process.env.RPC_PORT) || 8332,
+      user: process.env.RPC_USER,
+      password: process.env.RPC_PASSWORD,
       timeout: parseInt(process.env.RPC_TIMEOUT) || 30000
     };
+
+    // Validate required configuration
+    if (!this.config.host || !this.config.user || !this.config.password) {
+      console.error('[RPC] CRITICAL: RPC_HOST, RPC_USER, and RPC_PASSWORD must be set in .env');
+      console.error('[RPC] Bitcoin Core RPC will be unavailable');
+    }
 
     // Create axios instance with auth and timeout
     this.client = axios.create({
