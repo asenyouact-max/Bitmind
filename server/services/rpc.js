@@ -76,6 +76,31 @@ class RPCService {
         return Promise.reject(error);
       }
     );
+
+    // Phase 0.2: RPC failure state cache with 60s cooldown
+    this.failureState = {
+      lastFailureTime: 0,
+      lastFailureReason: null,
+      cooldownMs: 60000 // 60 seconds
+    };
+  }
+
+  /**
+   * Log RPC failure with cooldown to prevent spam
+   * @param {string} reason - Failure reason
+   * @param {string} endpoint - RPC endpoint
+   */
+  logFailure(reason, endpoint = 'unknown') {
+    const now = Date.now();
+    const timeSinceLastFailure = now - this.failureState.lastFailureTime;
+
+    // Only log if cooldown period has passed or failure reason changed
+    if (timeSinceLastFailure > this.failureState.cooldownMs ||
+        this.failureState.lastFailureReason !== reason) {
+      console.log(`[RPC] CONNECTION_FAILED reason=${reason} endpoint=${this.config.host}:${this.config.port} cooldown=${timeSinceLastFailure}ms`);
+      this.failureState.lastFailureTime = now;
+      this.failureState.lastFailureReason = reason;
+    }
   }
 
   /**
@@ -103,18 +128,24 @@ class RPCService {
 
       return response.data.result;
     } catch (error) {
-      // Handle different types of errors
+      // Handle different types of errors with structured logging
       if (error.code === 'ECONNREFUSED') {
+        this.logFailure('NETWORK_UNREACHABLE');
         throw new RPCError('Bitcoin Core RPC unreachable - check if node is running', -1);
       } else if (error.code === 'ECONNRESET') {
+        this.logFailure('CONNECTION_RESET');
         throw new RPCError('RPC connection reset by node', -1);
       } else if (error.response?.status === 401) {
+        this.logFailure('AUTH_INVALID');
         throw new RPCError('RPC authentication failed - check credentials', -1);
       } else if (error.code === 'ETIMEDOUT') {
+        this.logFailure('TIMEOUT');
         throw new RPCError('RPC request timeout - node may be busy', -1);
       } else if (error instanceof RPCError) {
+        this.logFailure('RPC_ERROR');
         throw error;
       } else {
+        this.logFailure('UNKNOWN_ERROR');
         throw new RPCError(`RPC communication error: ${error.message}`, -1);
       }
     }

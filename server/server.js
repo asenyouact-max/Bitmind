@@ -458,15 +458,20 @@ app.get('/api/shares', (req, res) => {
 // PRODUCTION-GRADE API HEALTH ENDPOINT - SYSTEM STATUS
 app.get('/api/health', (req, res) => {
   try {
+    // Safe state guards - prevent crashes if state.system is undefined
+    const systemUptime = state.system?.uptime ?? 0;
+    const connectedMiners = state.system?.connectedMiners ?? 0;
+    const totalHashrate = state.system?.totalHashrate ?? 0;
+
     res.json({
       status: 'ok',
       websocket: wsServer.clients.size > 0 ? 'active' : 'idle',
       stratum: stratumServerReady ? 'active' : 'inactive',
       bitcoin: 'connected',
       system: {
-        uptime: state.system.uptime,
-        connectedMiners: state.system.connectedMiners,
-        totalHashrate: state.system.totalHashrate
+        uptime: systemUptime,
+        connectedMiners: connectedMiners,
+        totalHashrate: totalHashrate
       }
     });
   } catch (error) {

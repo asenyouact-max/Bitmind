@@ -22,12 +22,36 @@ let consecutiveRpcFailures = 0;
 let lastRestartTime = 0;
 let isRestarting = false;
 
+// Phase 0.3: Watchdog failure state cache with cooldown
+const watchdogFailureState = {
+  lastFailureTime: 0,
+  lastFailureReason: null,
+  cooldownMs: 60000 // 60 seconds
+};
+
 /**
  * Log with timestamp
  */
 function log(message, level = 'INFO') {
   const timestamp = new Date().toISOString();
   console.log(`[WATCHDOG ${timestamp}] [${level}] ${message}`);
+}
+
+/**
+ * Log watchdog failure with cooldown to prevent spam
+ * @param {string} reason - Failure reason
+ */
+function logFailure(reason) {
+  const now = Date.now();
+  const timeSinceLastFailure = now - watchdogFailureState.lastFailureTime;
+
+  // Only log if cooldown period has passed or failure reason changed
+  if (timeSinceLastFailure > watchdogFailureState.cooldownMs ||
+      watchdogFailureState.lastFailureReason !== reason) {
+    log(`FAILURE reason=${reason} cooldown=${timeSinceLastFailure}ms`, 'WARN');
+    watchdogFailureState.lastFailureTime = now;
+    watchdogFailureState.lastFailureReason = reason;
+  }
 }
 
 /**
@@ -79,7 +103,7 @@ async function checkRpc() {
     return true;
   } catch (error) {
     consecutiveRpcFailures++;
-    log(`RPC check failed (${consecutiveRpcFailures}/${CONSECUTIVE_FAILURES_THRESHOLD}): ${error.message}`, 'WARN');
+    logFailure('RPC_CHECK_FAILED');
     return false;
   }
 }
@@ -92,18 +116,18 @@ async function checkLocalHealth() {
     const response = await axios.get(`http://localhost:${process.env.PORT || 3001}/health`, {
       timeout: HEALTH_CHECK_TIMEOUT_MS
     });
-    
+
     if (response.status === 200) {
       consecutiveHealthFailures = 0;
       return true;
     }
-    
+
     consecutiveHealthFailures++;
-    log(`Health check failed with status ${response.status} (${consecutiveHealthFailures}/${CONSECUTIVE_FAILURES_THRESHOLD})`, 'WARN');
+    logFailure('HEALTH_CHECK_FAILED');
     return false;
   } catch (error) {
     consecutiveHealthFailures++;
-    log(`Health check failed (${consecutiveHealthFailures}/${CONSECUTIVE_FAILURES_THRESHOLD}): ${error.message}`, 'WARN');
+    logFailure('HEALTH_CHECK_FAILED');
     return false;
   }
 }
