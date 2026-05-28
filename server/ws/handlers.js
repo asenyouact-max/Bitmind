@@ -4,6 +4,7 @@
 const state = require('../state');
 const { BitcoinValidation } = require('../services/bitcoinValidation');
 const { sessionManager } = require('../services/sessionManager');
+const DeviceRegistry = require('../services/deviceRegistry');
 
 // Track active sockets per device to prevent duplicates
 const activeSockets = new Map(); // deviceId -> ws
@@ -41,20 +42,42 @@ const validation = {
 
 // WebSocket event handlers - ONLY READ/WRITE THROUGH STATE MODULE
 const handlers = {
-  // Device registration handler with duplicate prevention
+  // Device registration handler with DeviceRegistry integration
   register: (ws, data) => {
     const deviceId = data.deviceId;
     const ipAddress = ws._socket.remoteAddress;
 
     // Production safety - validate input
     if (!validation.isValidDeviceId(deviceId)) {
-      console.log("🚫 INVALID DEVICE ID:", deviceId);
+      console.log("[WS] REGISTER_FAILED deviceId=null reason=INVALID_DEVICE_ID");
+      ws.send(JSON.stringify({
+        type: "error",
+        error: "INVALID_DEVICE_ID",
+        message: "Device ID is required"
+      }));
       return false;
     }
 
-    // Single device mode - only allow esp32-686C26E81F84
-    if (deviceId !== "esp32-686C26E81F84") {
-      console.log("🚫 UNKNOWN DEVICE BLOCKED:", deviceId);
+    // Check if device is registered in DeviceRegistry
+    const isRegistered = DeviceRegistry.isRegistered(deviceId);
+    const isDevClient = DeviceRegistry.isDevClient(deviceId);
+
+    // Dev mode: allow web-client-* devices with warning
+    if (!isRegistered && isDevClient) {
+      console.log("[WS] DEVICE_DEV_MODE_ALLOWED deviceId=" + deviceId + " reason=DEV_CLIENT_AUTO_ACCEPT");
+      // Auto-register dev clients
+      DeviceRegistry.register(deviceId, { deviceType: 'web-client' });
+    }
+
+    // If still not registered, reject with structured error
+    if (!DeviceRegistry.isRegistered(deviceId)) {
+      console.log("[WS] DEVICE_REJECTED_UNREGISTERED deviceId=" + deviceId);
+      ws.send(JSON.stringify({
+        type: "error",
+        error: "DEVICE_NOT_REGISTERED",
+        action: "CALL /device/register FIRST",
+        message: "Device must be registered via REST API before WebSocket connection"
+      }));
       return false;
     }
 
@@ -62,7 +85,7 @@ const handlers = {
     const now = Date.now();
     const lastRegister = registerDebounce.get(deviceId) || 0;
     if (now - lastRegister < REGISTER_DEBOUNCE_MS) {
-      console.log("⏱️  REGISTER DEBOUNCED:", deviceId, `(last: ${now - lastRegister}ms ago)`);
+      console.log("[WS] REGISTER_DEBOUNCED deviceId=" + deviceId + " lastRegister=" + (now - lastRegister) + "ms");
       return false;
     }
     registerDebounce.set(deviceId, now);
@@ -70,7 +93,7 @@ const handlers = {
     // Check for existing active socket and gracefully replace
     const existingSocket = activeSockets.get(deviceId);
     if (existingSocket && existingSocket !== ws && existingSocket.readyState === 1) {
-      console.log("🔄 REPLACING OLD SOCKET:", deviceId);
+      console.log("[WS] SOCKET_REPLACED deviceId=" + deviceId);
       existingSocket.close(1000, "Replaced by new connection");
       activeSockets.delete(deviceId);
     }
@@ -85,12 +108,12 @@ const handlers = {
       // Create or update device through state module
       let device = state.getDevice(deviceId);
       const isNewDevice = !device;
-      
+
       if (isNewDevice) {
         device = state.mutations.createDevice(deviceId);
-        console.log("📱 NEW DEVICE REGISTERED:", deviceId);
+        console.log("[WS] DEVICE_REGISTERED deviceId=" + deviceId + " source=WEBSOCKET");
       } else {
-        console.log("🔄 DEVICE RECONNECTED:", deviceId);
+        console.log("[WS] DEVICE_RECONNECTED deviceId=" + deviceId);
       }
 
       // Mark device as connected with lifecycle tracking
@@ -103,7 +126,7 @@ const handlers = {
           state.mutations.updateDevice(deviceId, {
             workerName: data.workerName.trim()
           });
-          console.log(`🏷️  Worker name set: ${data.workerName.trim()}`);
+          console.log("[WS] WORKER_NAME_SET deviceId=" + deviceId + " workerName=" + data.workerName.trim());
         }
       } else if (isNewDevice && !device.workerName) {
         // Fallback for new devices without workerName
@@ -111,7 +134,7 @@ const handlers = {
         state.mutations.updateDevice(deviceId, {
           workerName: fallbackName
         });
-        console.log(`🏷️  Fallback worker name: ${fallbackName}`);
+        console.log("[WS] WORKER_NAME_FALLBACK deviceId=" + deviceId + " workerName=" + fallbackName);
       }
 
       // Preserve firmware version if provided
@@ -129,7 +152,7 @@ const handlers = {
         difficulty: "0000ffff",
         target: "00000ffffffffffffffffffffffffffffffffffffffff"
       };
-      
+
       ws.send(JSON.stringify(miningJobMsg));
 
       // Update device with current job
@@ -139,14 +162,14 @@ const handlers = {
 
       // Store deviceId on WebSocket for cleanup
       ws.deviceId = deviceId;
-      
+
       // Track active socket
       activeSockets.set(deviceId, ws);
-      
+
       return true;
 
     } catch (e) {
-      console.log("❌ REGISTER HANDLER ERROR:", e.message);
+      console.log("[WS] REGISTER_ERROR deviceId=" + deviceId + " error=" + e.message);
       return false;
     }
   },
@@ -155,6 +178,7 @@ const handlers = {
   heartbeat: (ws, data) => {
     // Production safety - validate input
     if (!validation.isValidDeviceId(data.deviceId)) {
+      console.log("[WS] HEARTBEAT_FAILED deviceId=null reason=INVALID_DEVICE_ID");
       return false;
     }
 
@@ -167,7 +191,7 @@ const handlers = {
     });
 
     if (!device) {
-      console.log("⚠️ HEARTBEAT FROM UNKNOWN DEVICE:", data.deviceId);
+      console.log("[WS] HEARTBEAT_FROM_UNKNOWN deviceId=" + data.deviceId);
       return false;
     }
 
@@ -182,18 +206,18 @@ const handlers = {
 
   // Stats handler for miner telemetry
   stats: (ws, data) => {
-    console.log("📊 STATS RECEIVED from device:", data.deviceId);
+    console.log("[WS] STATS_RECEIVED deviceId=" + data.deviceId);
 
     // Production safety - validate input
     if (!validation.isValidStats(data)) {
-      console.log("🚫 INVALID STATS DATA:", data);
+      console.log("[WS] STATS_FAILED deviceId=" + (data.deviceId || 'null') + " reason=INVALID_STATS");
       return false;
     }
 
     // Get device through state module
     const device = state.getDevice(data.deviceId);
     if (!device) {
-      console.log("⚠️ STATS FROM UNKNOWN DEVICE:", data.deviceId);
+      console.log("[WS] STATS_FROM_UNKNOWN deviceId=" + data.deviceId);
       return false;
     }
 
@@ -213,38 +237,38 @@ const handlers = {
       status: "received"
     }));
 
-    console.log(`📊 Device ${data.deviceId} stats: ${data.hashrate} H/s, ${data.accepted} accepted, ${data.rejected} rejected, ${data.uptime}s uptime`);
-    
+    console.log("[WS] STATS_PROCESSED deviceId=" + data.deviceId + " hashrate=" + data.hashrate + " accepted=" + data.accepted + " rejected=" + data.rejected + " uptime=" + data.uptime);
+
     return true;
   },
 
   // Share submission handler
   shareFound: (ws, data) => {
-    console.log("📥 SHARE RECEIVED from device:", data.deviceId);
+    console.log("[WS] SHARE_RECEIVED deviceId=" + data.deviceId);
 
     // Production safety - validate input
     if (!validation.isValidShare(data)) {
-      console.log("🚫 INVALID SHARE DATA:", data);
+      console.log("[WS] SHARE_FAILED deviceId=" + (data.deviceId || 'null') + " reason=INVALID_SHARE");
       return false;
     }
 
     // Get device through state module
     const device = state.getDevice(data.deviceId);
     if (!device) {
-      console.log("⚠️ SHARE FROM UNKNOWN DEVICE:", data.deviceId);
+      console.log("[WS] SHARE_FROM_UNKNOWN deviceId=" + data.deviceId);
       return false;
     }
 
     // Get device context from session manager
     const currentSession = sessionManager.getCurrentSession();
     if (!currentSession) {
-      console.log("⚠️ NO ACTIVE SESSION for share validation");
+      console.log("[WS] SHARE_FAILED deviceId=" + data.deviceId + " reason=NO_ACTIVE_SESSION");
       return false;
     }
 
     const deviceContext = currentSession.getDeviceContext(data.deviceId);
     if (!deviceContext) {
-      console.log("⚠️ DEVICE NOT ASSIGNED TO SESSION:", data.deviceId);
+      console.log("[WS] SHARE_FAILED deviceId=" + data.deviceId + " reason=NOT_IN_SESSION");
       return false;
     }
 
@@ -288,22 +312,22 @@ const handlers = {
     };
 
     ws.send(JSON.stringify(response));
-    console.log(`📊 SHARE ${isAccepted ? 'ACCEPTED' : 'REJECTED'} for device:`, data.deviceId, `reason: ${validationResult.reason}`);
-    
+    console.log("[WS] SHARE_" + (isAccepted ? "ACCEPTED" : "REJECTED") + " deviceId=" + data.deviceId + " reason=" + validationResult.reason);
+
     return true;
   },
 
   // Device disconnect handler with cleanup
   disconnect: (ws) => {
     if (ws.deviceId) {
-      console.log("🔌 DEVICE DISCONNECTED:", ws.deviceId);
-      
+      console.log("[WS] DEVICE_DISCONNECTED deviceId=" + ws.deviceId + " reason=" + (ws.reason || "client_disconnect"));
+
       // Clean up active socket tracking
       const trackedSocket = activeSockets.get(ws.deviceId);
       if (trackedSocket === ws) {
         activeSockets.delete(ws.deviceId);
       }
-      
+
       // Mark device as disconnected with lifecycle tracking
       state.mutations.markDeviceDisconnected(ws.deviceId, ws.reason || "client_disconnect");
     }

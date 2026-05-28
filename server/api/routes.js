@@ -444,6 +444,49 @@ router.get('/system/status', (req, res) => {
   }
 });
 
+// Device Register endpoint - unified device registration
+router.post('/device/register', (req, res) => {
+  try {
+    const { deviceId, deviceType, walletAddress, workerName } = req.body;
+    const DeviceRegistry = require('../services/deviceRegistry');
+
+    // Validation
+    if (!deviceId || !deviceId.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'Device ID is required'
+      });
+    }
+
+    // Register device using DeviceRegistry
+    const result = DeviceRegistry.register(deviceId, {
+      deviceType: deviceType || 'web-client',
+      walletAddress: walletAddress || null,
+      workerName: workerName || null
+    });
+
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
+
+    console.log(`[API] Device registered: ${deviceId} (${result.isNew ? 'NEW' : 'UPDATE'})`);
+
+    res.json({
+      success: true,
+      deviceId: result.deviceId,
+      status: result.status,
+      isNew: result.isNew,
+      token: result.token
+    });
+  } catch (error) {
+    console.error('Error registering device:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to register device'
+    });
+  }
+});
+
 // Connect Miner endpoint - onboarding flow
 router.post('/miners/connect', (req, res) => {
   try {
