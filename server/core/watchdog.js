@@ -7,7 +7,7 @@ const axios = require('axios');
 const { rpcService } = require('../services/rpc');
 
 // Configuration
-const WATCHDOG_INTERVAL_MS = 15000; // 15 seconds
+const WATCHDOG_INTERVAL_MS = 60000; // Phase B.3: 60 seconds (reduced from 15s to minimize RPC polling)
 const HEALTH_CHECK_TIMEOUT_MS = 5000;
 const MAX_RESTARTS_PER_WINDOW = 3;
 const RESTART_WINDOW_MS = 600000; // 10 minutes
@@ -95,8 +95,14 @@ function recordRestart(reason) {
 
 /**
  * Check RPC connectivity
+ * Phase B.3: Skip polling if RPC is in AUTH_FAILED state
  */
 async function checkRpc() {
+  // Phase B.3: If RPC is in AUTH_FAILED state, skip polling entirely
+  if (rpcService.getState() === 'AUTH_FAILED') {
+    return false;
+  }
+
   try {
     await rpcService.getBlockchainInfo();
     consecutiveRpcFailures = 0;
@@ -201,16 +207,15 @@ async function watchdogCycle() {
     log(`CYCLE_SUMMARY duration=${cycleTime}ms rpc=${rpcOk ? 'OK' : 'FAIL'} health=${healthOk ? 'OK' : 'FAIL'} ws=${wsOk ? 'OK' : 'FAIL'} rpcFailures=${consecutiveRpcFailures} healthFailures=${consecutiveHealthFailures}`);
 
     // Determine if restart is needed
-    const rpcCritical = consecutiveRpcFailures >= CONSECUTIVE_FAILURES_THRESHOLD;
+    // Phase B.3: RPC is EXTERNAL_SERVICE - never restart due to RPC failure
     const healthCritical = consecutiveHealthFailures >= CONSECUTIVE_FAILURES_THRESHOLD;
 
-    if (rpcCritical) {
-      logFailure('RPC_CRITICAL_THRESHOLD');
-      triggerRestart('RPC critical failure');
-    } else if (healthCritical) {
+    if (healthCritical) {
       logFailure('HEALTH_CRITICAL_THRESHOLD');
       triggerRestart('Health critical failure');
     }
+    // Phase B.3: RPC failures are logged but do NOT trigger restart
+    // RPC is treated as external plugin, not critical dependency
 
   } catch (error) {
     log(`CYCLE_ERROR error=${error.message}`, 'ERROR');

@@ -12,6 +12,10 @@ echo "=========================================="
 echo "BITMIND RPC DIAGNOSTIC"
 echo "=========================================="
 echo ""
+echo -e "${YELLOW}⚠️  MANUAL TOOL ONLY - NOT PART OF RUNTIME SYSTEM${NC}"
+echo -e "${YELLOW}This script is for manual debugging only.${NC}"
+echo -e "${YELLOW}It is NOT auto-run by the backend.${NC}"
+echo ""
 
 # Load .env if exists
 if [ -f ".env" ]; then

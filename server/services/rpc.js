@@ -1,12 +1,29 @@
 const axios = require('axios');
 
 /**
- * Bitcoin Core RPC Bridge Service
- * Provides clean JSON-RPC communication with Bitcoin Core node
+ * Bitcoin Core RPC External Service Module
+ * Architecture: RPC is an EXTERNAL service, not a critical dependency
+ * States: CONNECTED, AUTH_FAILED, UNREACHABLE, DISABLED
+ * Behavior: Non-critical, isolated, fallback-safe
  */
 
 class RPCService {
   constructor() {
+    // Phase B.3: RPC Mode - EXTERNAL_SERVICE
+    this.RPC_MODE = "EXTERNAL_SERVICE";
+
+    // Explicit RPC states
+    this.RPC_STATES = {
+      CONNECTED: 'CONNECTED',
+      AUTH_FAILED: 'AUTH_FAILED',
+      UNREACHABLE: 'UNREACHABLE',
+      DISABLED: 'DISABLED'
+    };
+
+    // Current state
+    this.currentState = this.RPC_STATES.DISABLED;
+    this.lastStateChange = 0;
+
     // Production: RPC_HOST, RPC_USER, RPC_PASSWORD MUST be set in .env
     // No fallbacks - configuration is explicit
     this.config = {
@@ -19,8 +36,11 @@ class RPCService {
 
     // Validate required configuration
     if (!this.config.host || !this.config.user || !this.config.password) {
-      console.error('[RPC] CRITICAL: RPC_HOST, RPC_USER, and RPC_PASSWORD must be set in .env');
-      console.error('[RPC] Bitcoin Core RPC will be unavailable');
+      this.setState(this.RPC_STATES.DISABLED);
+      console.log('[RPC] EXTERNAL_SERVICE mode - configuration incomplete, RPC disabled');
+    } else {
+      this.setState(this.RPC_STATES.UNREACHABLE);
+      console.log('[RPC] EXTERNAL_SERVICE mode - configuration loaded, attempting connection');
     }
 
     // Create axios instance with auth and timeout
@@ -36,46 +56,8 @@ class RPCService {
       }
     });
 
-    // Request interceptor for logging (rate-limited to prevent spam)
-    this.lastLogTime = 0;
-    this.client.interceptors.request.use(
-      (config) => {
-        const now = Date.now();
-        if (now - this.lastLogTime > 5000) { // Log at most once per 5 seconds
-          console.log(`RPC Request: ${config.data?.method || 'unknown'}`);
-          this.lastLogTime = now;
-        }
-        return config;
-      },
-      (error) => {
-        const now = Date.now();
-        if (now - this.lastLogTime > 5000) {
-          console.error('RPC Request Error:', error.message);
-          this.lastLogTime = now;
-        }
-        return Promise.reject(error);
-      }
-    );
-
-    // Response interceptor for logging and error handling (rate-limited)
-    this.client.interceptors.response.use(
-      (response) => {
-        const now = Date.now();
-        if (now - this.lastLogTime > 5000) {
-          console.log(`RPC Response: ${response.data?.result ? 'success' : 'error'}`);
-          this.lastLogTime = now;
-        }
-        return response;
-      },
-      (error) => {
-        const now = Date.now();
-        if (now - this.lastLogTime > 5000) {
-          console.error('RPC Response Error:', error.message);
-          this.lastLogTime = now;
-        }
-        return Promise.reject(error);
-      }
-    );
+    // Phase B.3: Remove request/response interceptors to prevent log spam
+    // Only log state changes, not every request
 
     // Phase 0.2: RPC failure state cache with 60s cooldown
     this.failureState = {
@@ -83,14 +65,26 @@ class RPCService {
       lastFailureReason: null,
       cooldownMs: 60000 // 60 seconds
     };
+  }
 
-    // Phase B.1: Retry configuration with exponential backoff
-    this.retryConfig = {
-      maxRetries: 3,
-      baseDelayMs: 5000, // 5 seconds
-      maxDelayMs: 10000, // 10 seconds
-      backoffMultiplier: 1.5
-    };
+  /**
+   * Phase B.3: Set RPC state with state-change-only logging
+   * @param {string} newState - New RPC state
+   */
+  setState(newState) {
+    if (this.currentState !== newState) {
+      console.log(`[RPC] STATE_CHANGE from=${this.currentState} to=${newState} endpoint=${this.config.host}:${this.config.port}`);
+      this.currentState = newState;
+      this.lastStateChange = Date.now();
+    }
+  }
+
+  /**
+   * Get current RPC state
+   * @returns {string} Current state
+   */
+  getState() {
+    return this.currentState;
   }
 
   /**
@@ -159,6 +153,8 @@ class RPCService {
           );
         }
 
+        // Phase B.3: Set state to CONNECTED on success
+        this.setState(this.RPC_STATES.CONNECTED);
         return response.data.result;
       } catch (error) {
         lastError = error;
@@ -177,7 +173,14 @@ class RPCService {
           errorType = 'RPC_ERROR';
         }
 
-        // Log failure with structured logging
+        // Phase B.3: Set state based on error type
+        if (errorType === 'AUTH_INVALID') {
+          this.setState(this.RPC_STATES.AUTH_FAILED);
+        } else if (errorType === 'NETWORK_UNREACHABLE' || errorType === 'CONNECTION_RESET') {
+          this.setState(this.RPC_STATES.UNREACHABLE);
+        }
+
+        // Log failure with structured logging (cooldown enforced)
         this.logFailure(errorType);
 
         // If this is the last attempt, throw the error
@@ -199,7 +202,7 @@ class RPCService {
 
         // Calculate delay and wait before retry
         const delay = this.calculateRetryDelay(attempt);
-        console.log(`[RPC] RETRY attempt=${attempt}/${this.retryConfig.maxRetries} delay=${delay}ms reason=${errorType}`);
+        // Phase B.3: Remove retry spam logs - only state changes are logged
         await this.delay(delay);
       }
     }

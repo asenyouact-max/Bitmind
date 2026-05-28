@@ -467,11 +467,24 @@ app.get('/api/health', (req, res) => {
     const connectedMiners = state.system?.connectedMiners ?? 0;
     const totalHashrate = state.system?.totalHashrate ?? 0;
 
+    // Phase B.3: Get RPC state for clean fallback declaration
+    const rpcState = rpcService.getState();
+    const bitcoinMode = rpcState === 'CONNECTED' ? 'LIVE' : 'FALLBACK';
+    const bitcoinReason = rpcState === 'CONNECTED' ? 'RPC_AVAILABLE' : 'RPC_UNAVAILABLE';
+    const miningMode = rpcState === 'CONNECTED' ? 'LIVE_MINING' : 'SIMULATED_WORK_ONLY';
+
     res.json({
       status: 'ok',
       websocket: wsServer.clients.size > 0 ? 'active' : 'idle',
       stratum: stratumServerReady ? 'active' : 'inactive',
-      bitcoin: 'connected',
+      // Phase B.3: Clean fallback declaration
+      bitcoin: {
+        mode: bitcoinMode,
+        rpc: rpcState,
+        reason: bitcoinReason,
+        mining: miningMode,
+        dependency: 'EXTERNAL'
+      },
       system: {
         uptime: systemUptime,
         connectedMiners: connectedMiners,
