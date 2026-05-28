@@ -191,7 +191,7 @@ const handlers = {
     });
 
     if (!device) {
-      console.log("[WS] HEARTBEAT_FROM_UNKNOWN deviceId=" + data.deviceId);
+      console.log("[WS] HEARTBEAT_FROM_UNKNOWN deviceId=" + (data.deviceId || 'null'));
       return false;
     }
 
@@ -217,7 +217,7 @@ const handlers = {
     // Get device through state module
     const device = state.getDevice(data.deviceId);
     if (!device) {
-      console.log("[WS] STATS_FROM_UNKNOWN deviceId=" + data.deviceId);
+      console.log("[WS] STATS_FROM_UNKNOWN deviceId=" + (data.deviceId || 'null'));
       return false;
     }
 
@@ -255,20 +255,20 @@ const handlers = {
     // Get device through state module
     const device = state.getDevice(data.deviceId);
     if (!device) {
-      console.log("[WS] SHARE_FROM_UNKNOWN deviceId=" + data.deviceId);
+      console.log("[WS] SHARE_FROM_UNKNOWN deviceId=" + (data.deviceId || 'null'));
       return false;
     }
 
     // Get device context from session manager
     const currentSession = sessionManager.getCurrentSession();
     if (!currentSession) {
-      console.log("[WS] SHARE_FAILED deviceId=" + data.deviceId + " reason=NO_ACTIVE_SESSION");
+      console.log("[WS] SHARE_FAILED deviceId=" + (data.deviceId || 'null') + " reason=NO_ACTIVE_SESSION");
       return false;
     }
 
     const deviceContext = currentSession.getDeviceContext(data.deviceId);
     if (!deviceContext) {
-      console.log("[WS] SHARE_FAILED deviceId=" + data.deviceId + " reason=NOT_IN_SESSION");
+      console.log("[WS] SHARE_FAILED deviceId=" + (data.deviceId || 'null') + " reason=NOT_IN_SESSION");
       return false;
     }
 
