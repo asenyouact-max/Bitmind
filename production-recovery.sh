@@ -16,22 +16,23 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-BACKEND_DIR="/opt/Bitmind"
-ENV_FILE="$BACKEND_DIR/.env"
-SERVER_FILE="$BACKEND_DIR/server/server.js"
+REPO_DIR="/opt/Bitmind"
+BACKEND_DIR="$REPO_DIR/server"
+ENV_FILE="$REPO_DIR/.env"
+SERVER_FILE="$BACKEND_DIR/server.js"
 
 # Phase 1: Backend Stabilization
 echo "🔧 PHASE 1 — BACKEND STABILIZATION"
 echo "=========================================="
 echo ""
 
-# Step 1: Navigate to backend directory
-echo "📁 Navigating to backend directory..."
-cd $BACKEND_DIR || {
-    echo -e "${RED}✗ FAIL: Cannot access $BACKEND_DIR${NC}"
+# Step 1: Navigate to repo directory
+echo "📁 Navigating to repo directory..."
+cd $REPO_DIR || {
+    echo -e "${RED}✗ FAIL: Cannot access $REPO_DIR${NC}"
     exit 1
 }
-echo -e "${GREEN}✓ PASS: Backend directory accessible${NC}"
+echo -e "${GREEN}✓ PASS: Repo directory accessible${NC}"
 echo ""
 
 # Step 2: Create .env file
@@ -55,8 +56,12 @@ else
 fi
 echo ""
 
-# Step 3: Install dependencies
-echo "📦 Installing required dependencies..."
+# Step 3: Install dependencies (in server directory)
+echo "📦 Installing required dependencies in server directory..."
+cd $BACKEND_DIR || {
+    echo -e "${RED}✗ FAIL: Cannot access $BACKEND_DIR${NC}"
+    exit 1
+}
 npm install dotenv express ws cors axios || {
     echo -e "${RED}✗ FAIL: Dependency installation failed${NC}"
     exit 1
