@@ -47,7 +47,7 @@ const messageParsing = {
     try {
       return JSON.parse(message.toString());
     } catch (e) {
-      console.log("❌ JSON PARSE ERROR:", e.message);
+      console.log("[CORE_UTILS] JSON_PARSE_ERROR error=" + e.message);
       return null;
     }
   },

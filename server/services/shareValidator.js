@@ -229,9 +229,9 @@ class ShareValidator {
     }
     
     if (result.valid) {
-      console.log(`✅ VALID SHARE`);
+      console.log(`[SHARE_VALIDATOR] SHARE_VALID deviceId=${deviceId} nonce=${result.nonce}`);
     } else {
-      console.log(`❌ INVALID SHARE`);
+      console.log(`[SHARE_VALIDATOR] SHARE_INVALID deviceId=${deviceId} nonce=${result.nonce} reason=${result.reason || 'unknown'}`);
     }
     console.log(`   ======================================\n`);
   }

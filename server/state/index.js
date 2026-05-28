@@ -82,9 +82,13 @@ const mutations = {
 
   // System mutations
   updateSystemStats: () => {
+    // Phase B.3: Safe state wrapper - ensure state.system exists
+    if (!state.system) {
+      state.system = { connectedMiners: 0, totalHashrate: 0, uptime: 0 };
+    }
     const allDevices = Array.from(state.devices.values());
     state.system.connectedMiners = allDevices.filter(d => d.status === "online" || d.status === "mining").length;
-    state.system.totalHashrate = allDevices.reduce((sum, device) => sum + device.hashrate, 0);
+    state.system.totalHashrate = allDevices.reduce((sum, device) => sum + (device.hashrate || 0), 0);
   },
 
   // Lifecycle mutations
@@ -163,9 +167,13 @@ const getters = {
 
 // Helper function to update system stats
 function updateSystemStats() {
+  // Phase B.3: Safe state wrapper - ensure state.system exists
+  if (!state.system) {
+    state.system = { connectedMiners: 0, totalHashrate: 0, uptime: 0 };
+  }
   const allDevices = Array.from(state.devices.values());
   state.system.connectedMiners = allDevices.filter(d => d.status === "online" || d.status === "mining").length;
-  state.system.totalHashrate = allDevices.reduce((sum, device) => sum + device.hashrate, 0);
+  state.system.totalHashrate = allDevices.reduce((sum, device) => sum + (device.hashrate || 0), 0);
 }
 
 // Export read-only interface and controlled mutations

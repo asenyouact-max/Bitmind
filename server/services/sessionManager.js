@@ -187,7 +187,7 @@ class SessionManager {
     const deviceContext = this.currentSession.assignDevice(deviceId);
     this.deviceSessions.set(deviceId, this.currentSession.sessionId);
 
-    console.log(`📱 Assigned device ${deviceId} to session ${this.currentSession.sessionId} (nonce range: ${deviceContext.nonceStart}-${deviceContext.nonceEnd})`);
+    console.log(`[SESSION_MANAGER] DEVICE_ASSIGNED deviceId=${deviceId} sessionId=${this.currentSession.sessionId} nonceRange=${deviceContext.nonceStart}-${deviceContext.nonceEnd}`);
     
     return deviceContext;
   }
@@ -269,7 +269,7 @@ class SessionManager {
    * Invalidate all sessions (called on new block template)
    */
   invalidateAllSessions() {
-    console.log(`🔄 Invalidating ${this.sessions.size} mining sessions`);
+    console.log(`[SESSION_MANAGER] SESSIONS_INVALIDATED count=${this.sessions.size}`);
     
     for (const session of this.sessions.values()) {
       session.invalidate();

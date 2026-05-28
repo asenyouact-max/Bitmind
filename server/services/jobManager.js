@@ -77,14 +77,14 @@ class JobManager {
       this.miningStats.jobsGenerated++;
       this.miningStats.lastJobTime = createdAt;
       
-      console.log(`✅ Mining job generated: ${jobId} (height: ${blockTemplate.height})`);
-      console.log(`🆔 Session created: ${session.sessionId} for job ${jobId}`);
-      console.log(`🎯 Real target: ${blockTemplate.target}`);
+      console.log(`[JOB_MANAGER] JOB_GENERATED jobId=${jobId} height=${blockTemplate.height}`);
+      console.log(`[JOB_MANAGER] SESSION_CREATED sessionId=${session.sessionId} jobId=${jobId}`);
+      console.log(`[JOB_MANAGER] TARGET target=${blockTemplate.target}`);
       
       return miningJob;
       
     } catch (error) {
-      console.error('❌ Error generating mining job:', error);
+      console.error('[JOB_MANAGER] JOB_GENERATION_FAILED error=' + error.message);
       throw error;
     }
   }
@@ -119,14 +119,14 @@ class JobManager {
         const heightChanged = this.lastBlockHeight !== blockchainInfo.blocks;
         
         if (heightChanged) {
-          console.log(`⚡ Block height changed detected, forcing job refresh`);
+          console.log('[JOB_MANAGER] BLOCK_HEIGHT_CHANGED oldHeight=' + this.lastBlockHeight + ' newHeight=' + blockchainInfo.blocks);
           await this.generateAndBroadcastJob(wss, devices);
         } else {
           // Regular 30-second refresh
           await this.generateAndBroadcastJob(wss, devices);
         }
       } catch (error) {
-        console.error('❌ Job refresh error:', error.message);
+        console.error('[JOB_MANAGER] JOB_REFRESH_ERROR error=' + error.message);
       }
     }, 30000); // 30 seconds
   }
@@ -138,7 +138,7 @@ class JobManager {
     if (this.jobRefreshInterval) {
       clearInterval(this.jobRefreshInterval);
       this.jobRefreshInterval = null;
-      console.log('⏹ Job refresh cycle stopped');
+      console.log('[JOB_MANAGER] JOB_REFRESH_STOPPED');
     }
   }
 
@@ -195,7 +195,7 @@ class JobManager {
 
       this.miningStats.jobsBroadcast += broadcastCount;
       
-      console.log(`📡 Job broadcasted to ${broadcastCount} devices (jobId: ${job.jobId})`);
+      console.log('[JOB_MANAGER] JOB_BROADCASTED count=' + broadcastCount + ' jobId=' + job.jobId);
       
       return {
         success: true,
@@ -204,7 +204,7 @@ class JobManager {
       };
       
     } catch (error) {
-      console.error('❌ Error generating and broadcasting job:', error);
+      console.error('[JOB_MANAGER] JOB_BROADCAST_ERROR error=' + error.message);
       return {
         success: false,
         error: error.message
@@ -248,11 +248,11 @@ class JobManager {
     const deviceContext = sessionManager.assignDevice(deviceId);
     
     if (!deviceContext) {
-      console.log(`❌ No active session to assign work to device ${deviceId}`);
+      console.log('[JOB_MANAGER] NO_ACTIVE_SESSION deviceId=' + deviceId);
       return null;
     }
     
-    console.log(`📱 Assigned work to device ${deviceId}: sessionId=${deviceContext.sessionId}, nonceRange=${deviceContext.nonceStart}-${deviceContext.nonceEnd}`);
+    console.log('[JOB_MANAGER] WORK_ASSIGNED deviceId=' + deviceId + ' sessionId=' + deviceContext.sessionId + ' nonceRange=' + deviceContext.nonceStart + '-' + deviceContext.nonceEnd);
     return deviceContext;
   }
 

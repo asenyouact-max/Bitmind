@@ -49,17 +49,16 @@ global.wsServer = wsServer;
 
 // Handle WebSocket upgrade requests
 server.on('upgrade', (request, socket, head) => {
-  console.log("🔍 UPGRADE REQUEST:", request.url);
-  console.log("🔍 UPGRADE HEADERS:", request.headers);
+  console.log("[WS] UPGRADE_REQUEST path=" + request.url);
   
   if (request.url === '/ws') {
-    console.log("✅ WS UPGRADE ACCEPTED for /ws");
+    console.log("[WS] UPGRADE_ACCEPTED path=/ws");
     wsServer.handleUpgrade(request, socket, head, (ws) => {
-      console.log("✅ WS CLIENT CONNECTED");
+      console.log("[WS] CLIENT_CONNECTED");
       wsServer.emit('connection', ws, request);
     });
   } else {
-    console.log("❌ WS UPGRADE REJECTED - wrong path:", request.url);
+    console.log("[WS] UPGRADE_REJECTED path=" + request.url + " reason=INVALID_PATH");
     socket.destroy();
   }
 });
@@ -147,8 +146,8 @@ process.on('uncaughtException', (err) => {
 
 // WebSocket connection handling
 wsServer.on('connection', (ws, req) => {
-  console.log('✅ WS OPEN:', req.socket.remoteAddress);
-  console.log("🟢 WS CONNECTED | clients:", wsServer.clients.size);
+  console.log('[WS] CONNECTION_OPEN remoteAddress=' + req.socket.remoteAddress);
+  console.log("[WS] CLIENT_COUNT count=" + wsServer.clients.size);
   
   // Initialize socket liveness tracking
   ws.isAlive = true;
@@ -170,16 +169,16 @@ wsServer.on('connection', (ws, req) => {
       // Use core utilities for safe parsing
       const data = coreUtils.messageParsing.safeParse(msg);
       if (!data) {
-        console.log("❌ INVALID JSON - cannot parse message");
+        console.log("[WS] MESSAGE_PARSE_FAILED reason=INVALID_JSON");
         return;
       }
 
       if (!coreUtils.messageParsing.validateMessage(data)) {
-        console.log("❌ INVALID MESSAGE FORMAT:", data);
+        console.log("[WS] MESSAGE_INVALID type=" + (data?.type || 'null') + " reason=INVALID_FORMAT");
         return;
       }
 
-      console.log("✅ PARSED:", data.type);
+      console.log("[WS] MESSAGE_PARSED type=" + data.type);
 
       // Route to appropriate handler using modular structure
       switch (data.type) {
@@ -200,30 +199,30 @@ wsServer.on('connection', (ws, req) => {
           break;
           
         default:
-          console.log("❌ UNKNOWN MESSAGE TYPE:", data.type);
+          console.log("[WS] MESSAGE_UNKNOWN type=" + data.type + " reason=UNHANDLED_TYPE");
       }
     } catch (error) {
-      console.error("❌ MESSAGE HANDLING ERROR:", error.message);
+      console.error("[WS] MESSAGE_ERROR error=" + error.message);
       // Don't close connection on message errors - just log and continue
     }
   });
   
   // Handle disconnection using modular structure
   ws.on('close', (code, reason) => {
-    console.log("❌ WS CLOSED | code:", code, "reason:", reason);
-    console.log(" CLOSE DEVICE ID:", ws.deviceId || 'unknown');
-    console.log(" AFTER CLOSE | clients:", wsServer.clients.size);
-    
+    console.log("[WS] CONNECTION_CLOSED code=" + code + " reason=" + (reason || 'null'));
+    console.log("[WS] DEVICE_DISCONNECTED deviceId=" + (ws.deviceId || 'null'));
+    console.log("[WS] CLIENT_COUNT_AFTER_CLOSE count=" + wsServer.clients.size);
+
     // Use modular disconnect handler
     wsHandlers.handlers.disconnect(ws);
   });
   
   // Handle errors - COMPREHENSIVE LOGGING
   ws.on('error', (error) => {
-    console.log(" WS ERROR FULL:", error);
-    console.log(" WS ERROR MESSAGE:", error.message);
-    console.log(" WS ERROR STACK:", error.stack);
-    console.log(" ERROR DEVICE ID:", ws.deviceId || 'unknown');
+    console.log("[WS] ERROR_FULL error=" + JSON.stringify(error));
+    console.log("[WS] ERROR_MESSAGE message=" + error.message);
+    console.log("[WS] ERROR_STACK stack=" + error.stack);
+    console.log("[WS] ERROR_DEVICE deviceId=" + (ws.deviceId || 'null'));
     // NEVER close socket here
   });
   
@@ -414,8 +413,13 @@ app.get('/api/stats', (req, res) => {
     const totalAcceptedShares = allDevices.reduce((sum, device) => sum + device.acceptedShares, 0);
     const totalRejectedShares = allDevices.reduce((sum, device) => sum + device.rejectedShares, 0);
     const totalDevicesOnline = allDevices.filter(device => device.status === 'online' || device.status === 'mining').length;
-    const totalHashrate = allDevices.reduce((sum, device) => sum + device.hashrate, 0);
-    
+    const totalHashrate = allDevices.reduce((sum, device) => sum + (device.hashrate || 0), 0);
+
+    // Phase B.3: Safe state wrapper - ensure state.system exists
+    if (!state.system) {
+      state.system = { connectedMiners: 0, totalHashrate: 0, uptime: 0 };
+    }
+
     // Update system state
     state.system.connectedMiners = totalDevicesOnline;
     state.system.totalHashrate = totalHashrate;
@@ -483,11 +487,11 @@ app.get('/api/health', (req, res) => {
   }
 });
 
-console.log("� PRODUCTION-GRADE BITMIND BACKEND");
-console.log("� Unified state system active");
-console.log("� Single device: esp32-686C26E81F84");
-console.log("⚡ Real-time WebSocket → API sync");
-console.log("�️ Production hardened");
+console.log("[SYSTEM] PRODUCTION_GRADE_BITMIND_BACKEND");
+console.log("[SYSTEM] UNIFIED_STATE_ACTIVE");
+console.log("[SYSTEM] DEVICE_REGISTRY_ENABLED");
+console.log("[SYSTEM] WEBSOCKET_API_SYNC");
+console.log("[SYSTEM] PRODUCTION_HARDENED");
 
 // PRODUCTION-GRADE MODULAR ARCHITECTURE
 // Global references for cleanup and health checks

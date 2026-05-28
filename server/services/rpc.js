@@ -83,6 +83,14 @@ class RPCService {
       lastFailureReason: null,
       cooldownMs: 60000 // 60 seconds
     };
+
+    // Phase B.1: Retry configuration with exponential backoff
+    this.retryConfig = {
+      maxRetries: 3,
+      baseDelayMs: 5000, // 5 seconds
+      maxDelayMs: 10000, // 10 seconds
+      backoffMultiplier: 1.5
+    };
   }
 
   /**
@@ -104,51 +112,100 @@ class RPCService {
   }
 
   /**
-   * Generic RPC helper function
+   * Delay helper for retry backoff
+   * @param {number} ms - Milliseconds to delay
+   * @returns {Promise<void>}
+   */
+  async delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Calculate retry delay with exponential backoff
+   * @param {number} attempt - Current attempt number
+   * @returns {number} Delay in milliseconds
+   */
+  calculateRetryDelay(attempt) {
+    const delay = Math.min(
+      this.retryConfig.baseDelayMs * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+      this.retryConfig.maxDelayMs
+    );
+    return Math.floor(delay);
+  }
+
+  /**
+   * Generic RPC helper function with retry backoff
    * @param {string} method - Bitcoin Core RPC method name
    * @param {Array} params - RPC parameters (default: [])
    * @returns {Promise<any>} RPC result
    */
   async rpc(method, params = []) {
-    try {
-      const response = await this.client.post('', {
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method: method,
-        params: params
-      });
+    let lastError = null;
 
-      // Handle JSON-RPC response
-      if (response.data.error) {
-        throw new RPCError(
-          response.data.error.message || 'Unknown RPC error',
-          response.data.error.code || -1
-        );
-      }
+    for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
+      try {
+        const response = await this.client.post('', {
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: method,
+          params: params
+        });
 
-      return response.data.result;
-    } catch (error) {
-      // Handle different types of errors with structured logging
-      if (error.code === 'ECONNREFUSED') {
-        this.logFailure('NETWORK_UNREACHABLE');
-        throw new RPCError('Bitcoin Core RPC unreachable - check if node is running', -1);
-      } else if (error.code === 'ECONNRESET') {
-        this.logFailure('CONNECTION_RESET');
-        throw new RPCError('RPC connection reset by node', -1);
-      } else if (error.response?.status === 401) {
-        this.logFailure('AUTH_INVALID');
-        throw new RPCError('RPC authentication failed - check credentials', -1);
-      } else if (error.code === 'ETIMEDOUT') {
-        this.logFailure('TIMEOUT');
-        throw new RPCError('RPC request timeout - node may be busy', -1);
-      } else if (error instanceof RPCError) {
-        this.logFailure('RPC_ERROR');
-        throw error;
-      } else {
-        this.logFailure('UNKNOWN_ERROR');
-        throw new RPCError(`RPC communication error: ${error.message}`, -1);
+        // Handle JSON-RPC response
+        if (response.data.error) {
+          throw new RPCError(
+            response.data.error.message || 'Unknown RPC error',
+            response.data.error.code || -1
+          );
+        }
+
+        return response.data.result;
+      } catch (error) {
+        lastError = error;
+
+        // Classify error type
+        let errorType = 'UNKNOWN_ERROR';
+        if (error.code === 'ECONNREFUSED') {
+          errorType = 'NETWORK_UNREACHABLE';
+        } else if (error.code === 'ECONNRESET') {
+          errorType = 'CONNECTION_RESET';
+        } else if (error.response?.status === 401) {
+          errorType = 'AUTH_INVALID';
+        } else if (error.code === 'ETIMEDOUT') {
+          errorType = 'TIMEOUT';
+        } else if (error instanceof RPCError) {
+          errorType = 'RPC_ERROR';
+        }
+
+        // Log failure with structured logging
+        this.logFailure(errorType);
+
+        // If this is the last attempt, throw the error
+        if (attempt === this.retryConfig.maxRetries) {
+          if (errorType === 'NETWORK_UNREACHABLE') {
+            throw new RPCError('Bitcoin Core RPC unreachable - check if node is running', -1);
+          } else if (errorType === 'CONNECTION_RESET') {
+            throw new RPCError('RPC connection reset by node', -1);
+          } else if (errorType === 'AUTH_INVALID') {
+            throw new RPCError('RPC authentication failed - check credentials', -1);
+          } else if (errorType === 'TIMEOUT') {
+            throw new RPCError('RPC request timeout - node may be busy', -1);
+          } else if (error instanceof RPCError) {
+            throw error;
+          } else {
+            throw new RPCError(`RPC communication error: ${error.message}`, -1);
+          }
+        }
+
+        // Calculate delay and wait before retry
+        const delay = this.calculateRetryDelay(attempt);
+        console.log(`[RPC] RETRY attempt=${attempt}/${this.retryConfig.maxRetries} delay=${delay}ms reason=${errorType}`);
+        await this.delay(delay);
       }
     }
+
+    // This should never be reached, but just in case
+    throw lastError || new RPCError('RPC failed after retries', -1);
   }
 
   /**

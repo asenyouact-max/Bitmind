@@ -182,38 +182,38 @@ async function watchdogCycle() {
   if (isRestarting) {
     return;
   }
-  
+
   const startTime = Date.now();
-  
+
   try {
-    log('Starting watchdog cycle');
-    
     // Check RPC
     const rpcOk = await checkRpc();
-    
+
     // Check local health
     const healthOk = await checkLocalHealth();
-    
+
     // Check WebSocket
     const wsOk = checkWebSocket();
-    
+
     const cycleTime = Date.now() - startTime;
-    log(`Watchdog cycle completed in ${cycleTime}ms - RPC: ${rpcOk ? 'OK' : 'FAIL'}, Health: ${healthOk ? 'OK' : 'FAIL'}, WS: ${wsOk ? 'OK' : 'FAIL'}`);
-    
+
+    // Phase B.4: Structured summary log - one per cycle
+    log(`CYCLE_SUMMARY duration=${cycleTime}ms rpc=${rpcOk ? 'OK' : 'FAIL'} health=${healthOk ? 'OK' : 'FAIL'} ws=${wsOk ? 'OK' : 'FAIL'} rpcFailures=${consecutiveRpcFailures} healthFailures=${consecutiveHealthFailures}`);
+
     // Determine if restart is needed
     const rpcCritical = consecutiveRpcFailures >= CONSECUTIVE_FAILURES_THRESHOLD;
     const healthCritical = consecutiveHealthFailures >= CONSECUTIVE_FAILURES_THRESHOLD;
-    
+
     if (rpcCritical) {
-      log(`RPC critical failure threshold reached (${consecutiveRpcFailures}/${CONSECUTIVE_FAILURES_THRESHOLD})`, 'ERROR');
+      logFailure('RPC_CRITICAL_THRESHOLD');
       triggerRestart('RPC critical failure');
     } else if (healthCritical) {
-      log(`Health critical failure threshold reached (${consecutiveHealthFailures}/${CONSECUTIVE_FAILURES_THRESHOLD})`, 'ERROR');
+      logFailure('HEALTH_CRITICAL_THRESHOLD');
       triggerRestart('Health critical failure');
     }
-    
+
   } catch (error) {
-    log(`Watchdog cycle error: ${error.message}`, 'ERROR');
+    log(`CYCLE_ERROR error=${error.message}`, 'ERROR');
   }
 }
 
@@ -222,16 +222,15 @@ async function watchdogCycle() {
  */
 function startWatchdog() {
   if (watchdogInterval) {
-    log('Watchdog already running');
+    log('WATCHDOG_ALREADY_RUNNING');
     return;
   }
-  
-  log('Starting watchdog with 15s interval');
-  log(`Configuration: Max ${MAX_RESTARTS_PER_WINDOW} restarts per ${RESTART_WINDOW_MS / 60000}min, ${RESTART_COOLDOWN_MS / 1000}s cooldown`);
-  
+
+  log('WATCHDOG_START interval=15s maxRestarts=' + MAX_RESTARTS_PER_WINDOW + ' window=' + (RESTART_WINDOW_MS / 60000) + 'min cooldown=' + (RESTART_COOLDOWN_MS / 1000) + 's');
+
   // Initial check after 5 seconds
   setTimeout(watchdogCycle, 5000);
-  
+
   // Start interval
   watchdogInterval = setInterval(watchdogCycle, WATCHDOG_INTERVAL_MS);
 }
@@ -243,7 +242,7 @@ function stopWatchdog() {
   if (watchdogInterval) {
     clearInterval(watchdogInterval);
     watchdogInterval = null;
-    log('Watchdog stopped');
+    log('WATCHDOG_STOPPED');
   }
 }
 
