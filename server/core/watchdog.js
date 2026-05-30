@@ -1,10 +1,12 @@
 /**
  * Bitmind Watchdog - Auto-Recovery Layer
  * Monitors system health and triggers controlled restarts
+ * Phase C: Watchdog is OBSERVER-ONLY - reads systemState, never modifies it
  */
 
 const axios = require('axios');
 const { rpcService } = require('../services/rpc');
+const { getState } = require('../state/systemState');
 
 // Configuration
 const WATCHDOG_INTERVAL_MS = 60000; // Phase B.3: 60 seconds (reduced from 15s to minimize RPC polling)
@@ -192,8 +194,8 @@ async function watchdogCycle() {
   const startTime = Date.now();
 
   try {
-    // Check RPC
-    const rpcOk = await checkRpc();
+    // Phase C.3: Read system state (observer-only)
+    const state = getState();
 
     // Check local health
     const healthOk = await checkLocalHealth();
@@ -203,19 +205,17 @@ async function watchdogCycle() {
 
     const cycleTime = Date.now() - startTime;
 
-    // Phase B.4: Structured summary log - one per cycle
-    log(`CYCLE_SUMMARY duration=${cycleTime}ms rpc=${rpcOk ? 'OK' : 'FAIL'} health=${healthOk ? 'OK' : 'FAIL'} ws=${wsOk ? 'OK' : 'FAIL'} rpcFailures=${consecutiveRpcFailures} healthFailures=${consecutiveHealthFailures}`);
+    // Phase C.3: Structured summary log using systemState
+    log(`CYCLE_SUMMARY duration=${cycleTime}ms rpc=${state.bitcoin.rpc} mode=${state.bitcoin.mode} health=${healthOk ? 'OK' : 'FAIL'} ws=${wsOk ? 'OK' : 'FAIL'}`);
 
-    // Determine if restart is needed
-    // Phase B.3: RPC is EXTERNAL_SERVICE - never restart due to RPC failure
+    // Determine if restart is needed (only health endpoint, never RPC)
     const healthCritical = consecutiveHealthFailures >= CONSECUTIVE_FAILURES_THRESHOLD;
 
     if (healthCritical) {
       logFailure('HEALTH_CRITICAL_THRESHOLD');
       triggerRestart('Health critical failure');
     }
-    // Phase B.3: RPC failures are logged but do NOT trigger restart
-    // RPC is treated as external plugin, not critical dependency
+    // Phase C.3: Watchdog does NOT modify systemState - only reads it
 
   } catch (error) {
     log(`CYCLE_ERROR error=${error.message}`, 'ERROR');

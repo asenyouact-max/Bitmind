@@ -1,10 +1,12 @@
 const axios = require('axios');
+const { updateBitcoinState, updateRPCState } = require('../state/systemState');
 
 /**
  * Bitcoin Core RPC External Service Module
  * Architecture: RPC is an EXTERNAL service, not a critical dependency
  * States: CONNECTED, AUTH_FAILED, UNREACHABLE, DISABLED
  * Behavior: Non-critical, isolated, fallback-safe
+ * Phase C: RPC is WRITER-ONLY - updates systemState, never decides system behavior
  */
 
 class RPCService {
@@ -161,8 +163,18 @@ class RPCService {
           );
         }
 
-        // Phase B.3: Set state to CONNECTED on success
+        // Phase C.2: Update systemState on success (writer-only)
         this.setState(this.RPC_STATES.CONNECTED);
+        updateBitcoinState({
+          rpc: "CONNECTED",
+          mode: "LIVE",
+          mining: "LIVE_MINING",
+          lastError: null
+        });
+        updateRPCState({
+          connected: true,
+          failureCount: 0
+        });
         return response.data.result;
       } catch (error) {
         lastError = error;
@@ -184,8 +196,30 @@ class RPCService {
         // Phase B.3: Set state based on error type
         if (errorType === 'AUTH_INVALID') {
           this.setState(this.RPC_STATES.AUTH_FAILED);
+          // Phase C.2: Update systemState on AUTH failure
+          updateBitcoinState({
+            rpc: "AUTH_FAILED",
+            mode: "FALLBACK",
+            mining: "SIMULATED_WORK_ONLY",
+            lastError: error.message
+          });
+          updateRPCState({
+            connected: false,
+            failureCount: (this.failureState?.lastFailureReason === 'AUTH_INVALID' ? 0 : 1) + 1
+          });
         } else if (errorType === 'NETWORK_UNREACHABLE' || errorType === 'CONNECTION_RESET') {
           this.setState(this.RPC_STATES.UNREACHABLE);
+          // Phase C.2: Update systemState on network failure
+          updateBitcoinState({
+            rpc: "UNREACHABLE",
+            mode: "FALLBACK",
+            mining: "SIMULATED_WORK_ONLY",
+            lastError: error.message
+          });
+          updateRPCState({
+            connected: false,
+            failureCount: (this.failureState?.lastFailureReason === 'NETWORK_UNREACHABLE' ? 0 : 1) + 1
+          });
         }
 
         // Log failure with structured logging (cooldown enforced)

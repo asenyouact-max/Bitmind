@@ -17,6 +17,7 @@ const { jobManager } = require('./services/jobManager');
 const { shareValidator } = require('./services/shareValidator');
 const { sessionManager } = require('./services/sessionManager');
 const state = require('./state');
+const { getState } = require('./state/systemState');
 const wsHandlers = require('./ws/handlers');
 const apiRoutes = require('./api/routes');
 const miningServices = require('./services/mining');
@@ -459,36 +460,23 @@ app.get('/api/shares', (req, res) => {
   }
 });
 
-// PRODUCTION-GRADE API HEALTH ENDPOINT - SYSTEM STATUS
+// PRODUCTION-GRADE API HEALTH ENDPOINT - PURE VIEW LAYER
+// Phase C.5: No computation, no inference, no fallback logic - pure state dump
 app.get('/api/health', (req, res) => {
   try {
-    // Safe state guards - prevent crashes if state.system is undefined
-    const systemUptime = state.system?.uptime ?? 0;
-    const connectedMiners = state.system?.connectedMiners ?? 0;
-    const totalHashrate = state.system?.totalHashrate ?? 0;
-
-    // Phase B.3: Get RPC state for clean fallback declaration
-    const rpcState = rpcService.getState();
-    const bitcoinMode = rpcState === 'CONNECTED' ? 'LIVE' : 'FALLBACK';
-    const bitcoinReason = rpcState === 'CONNECTED' ? 'RPC_AVAILABLE' : 'RPC_UNAVAILABLE';
-    const miningMode = rpcState === 'CONNECTED' ? 'LIVE_MINING' : 'SIMULATED_WORK_ONLY';
+    const systemState = getState();
 
     res.json({
       status: 'ok',
       websocket: wsServer.clients.size > 0 ? 'active' : 'idle',
       stratum: stratumServerReady ? 'active' : 'inactive',
-      // Phase B.3: Clean fallback declaration
-      bitcoin: {
-        mode: bitcoinMode,
-        rpc: rpcState,
-        reason: bitcoinReason,
-        mining: miningMode,
-        dependency: 'EXTERNAL'
-      },
+      // Phase C.5: Pure state dump from systemState
+      bitcoin: systemState.bitcoin,
+      rpc: systemState.rpc,
       system: {
-        uptime: systemUptime,
-        connectedMiners: connectedMiners,
-        totalHashrate: totalHashrate
+        uptime: state.system?.uptime ?? 0,
+        connectedMiners: state.system?.connectedMiners ?? 0,
+        totalHashrate: state.system?.totalHashrate ?? 0
       }
     });
   } catch (error) {
@@ -892,20 +880,12 @@ async function startServer() {
     console.log(`[SYSTEM] Node version: ${process.version}`);
     console.log(`[SYSTEM] Platform: ${process.platform}`);
 
-    // Step 1: Test Bitcoin Core connection (SOFT FAIL - continue if fails)
-    console.log(`[SYSTEM] Testing Bitcoin Core RPC connection...`);
-    const bitcoinConnected = await rpcService.testConnection();
+    // Phase C.4: Read system state (no guessing logic)
+    const systemState = getState();
+    console.log(`[SYSTEM] Bitcoin mode: ${systemState.bitcoin.mode}`);
+    console.log(`[SYSTEM] Bitcoin RPC: ${systemState.bitcoin.rpc}`);
 
-    if (!bitcoinConnected) {
-      console.warn(`[WARN] ⚠️ Bitcoin Core RPC is not reachable`);
-      console.warn(`[WARN] RPC endpoint: ${RPC_HOST}:${RPC_PORT}`);
-      console.warn(`[WARN] Mining will use fallback work`);
-      console.warn(`[WARN] Please ensure Bitcoin Core is running for actual mining`);
-    } else {
-      console.log(`[SYSTEM] ✅ Bitcoin Core RPC is reachable`);
-    }
-    
-    // Step 2: Start backend server - always binds, never exits
+    // Step 1: Start backend server - always binds, never exits
     console.log(`[SYSTEM] Starting backend HTTP server...`);
     await new Promise((resolve) => {
       server.listen(PORT, '0.0.0.0', () => {
@@ -946,7 +926,7 @@ async function startServer() {
     console.log(`[SYSTEM] ========================================`);
     console.log(`[SYSTEM] Backend: http://0.0.0.0:${PORT}`);
     console.log(`[SYSTEM] Stratum: 0.0.0.0:${STRATUM_PORT}`);
-    console.log(`[SYSTEM] Bitcoin: ${bitcoinConnected ? 'Connected' : 'FALLBACK'}`);
+    console.log(`[SYSTEM] Bitcoin: ${systemState.bitcoin.mode}`);
     console.log(`[SYSTEM] Miners can now connect to 192.168.1.12:${STRATUM_PORT}`);
     console.log(`[SYSTEM] System status: http://0.0.0.0:${PORT}/api/system/status`);
     console.log(`[SYSTEM] Health check: http://0.0.0.0:${PORT}/health`);
