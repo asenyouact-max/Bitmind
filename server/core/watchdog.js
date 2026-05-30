@@ -231,7 +231,7 @@ function startWatchdog() {
     return;
   }
 
-  log('WATCHDOG_START interval=15s maxRestarts=' + MAX_RESTARTS_PER_WINDOW + ' window=' + (RESTART_WINDOW_MS / 60000) + 'min cooldown=' + (RESTART_COOLDOWN_MS / 1000) + 's');
+  log('WATCHDOG_START interval=' + (WATCHDOG_INTERVAL_MS / 1000) + 's maxRestarts=' + MAX_RESTARTS_PER_WINDOW + ' window=' + (RESTART_WINDOW_MS / 60000) + 'min cooldown=' + (RESTART_COOLDOWN_MS / 1000) + 's');
 
   // Initial check after 5 seconds
   setTimeout(watchdogCycle, 5000);

@@ -65,6 +65,14 @@ class RPCService {
       lastFailureReason: null,
       cooldownMs: 60000 // 60 seconds
     };
+
+    // Phase B.1: Retry configuration with exponential backoff
+    this.retryConfig = {
+      maxRetries: 3,
+      baseDelayMs: 5000, // 5 seconds
+      maxDelayMs: 10000, // 10 seconds
+      backoffMultiplier: 1.5
+    };
   }
 
   /**

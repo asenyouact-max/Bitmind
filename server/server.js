@@ -946,7 +946,7 @@ async function startServer() {
     console.log(`[SYSTEM] ========================================`);
     console.log(`[SYSTEM] Backend: http://0.0.0.0:${PORT}`);
     console.log(`[SYSTEM] Stratum: 0.0.0.0:${STRATUM_PORT}`);
-    console.log(`[SYSTEM] Bitcoin: Connected`);
+    console.log(`[SYSTEM] Bitcoin: ${bitcoinConnected ? 'Connected' : 'FALLBACK'}`);
     console.log(`[SYSTEM] Miners can now connect to 192.168.1.12:${STRATUM_PORT}`);
     console.log(`[SYSTEM] System status: http://0.0.0.0:${PORT}/api/system/status`);
     console.log(`[SYSTEM] Health check: http://0.0.0.0:${PORT}/health`);
