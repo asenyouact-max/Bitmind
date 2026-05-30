@@ -1,0 +1,226 @@
+{
+  "protocolVersion": "1.0",
+  "protocolName": "Bitmind Device Protocol",
+  "description": "Immutable communication contract between ESP32 devices and Bitmind backend",
+  "status": "STABLE",
+  "lastUpdated": "2026-05-30",
+
+  "messageTypes": {
+    "device.register": {
+      "direction": "ESP → Server",
+      "description": "Device registration handshake",
+      "schema": {
+        "type": "object",
+        "required": ["type", "deviceId", "deviceType", "firmwareVersion"],
+        "properties": {
+          "type": { "const": "device.register" },
+          "deviceId": { "type": "string", "pattern": "^esp32-[a-f0-9]{4,12}$" },
+          "deviceType": { "enum": ["oled_miner", "miner", "test_client"] },
+          "firmwareVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "oled": { "type": "boolean" },
+              "wifi": { "type": "boolean" },
+              "stratum": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+
+    "device.registered": {
+      "direction": "Server → ESP",
+      "description": "Registration acknowledgment",
+      "schema": {
+        "type": "object",
+        "required": ["type", "status", "deviceId", "token", "serverTime"],
+        "properties": {
+          "type": { "const": "device.registered" },
+          "status": { "const": "accepted" },
+          "deviceId": { "type": "string" },
+          "token": { "type": "string", "minLength": 32 },
+          "serverTime": { "type": "integer" }
+        }
+      }
+    },
+
+    "device.heartbeat": {
+      "direction": "ESP → Server",
+      "description": "Device keep-alive signal",
+      "schema": {
+        "type": "object",
+        "required": ["type", "deviceId", "uptime", "wifiRssi"],
+        "properties": {
+          "type": { "const": "device.heartbeat" },
+          "deviceId": { "type": "string" },
+          "uptime": { "type": "integer", "minimum": 0 },
+          "wifiRssi": { "type": "integer", "maximum": 0, "minimum": -100 }
+        }
+      }
+    },
+
+    "device.heartbeat.ack": {
+      "direction": "Server → ESP",
+      "description": "Heartbeat acknowledgment with system state",
+      "schema": {
+        "type": "object",
+        "required": ["type", "systemState"],
+        "properties": {
+          "type": { "const": "device.heartbeat.ack" },
+          "systemState": {
+            "type": "object",
+            "required": ["status", "mode", "rpc", "mining"],
+            "properties": {
+              "status": { "enum": ["ok", "degraded", "critical"] },
+              "mode": { "enum": ["FALLBACK", "LIVE"] },
+              "rpc": { "enum": ["CONNECTED", "AUTH_FAILED", "UNREACHABLE", "DISABLED"] },
+              "mining": { "enum": ["LIVE_MINING", "SIMULATED_WORK_ONLY", "IDLE"] }
+            }
+          }
+        }
+      }
+    },
+
+    "mining.job": {
+      "direction": "Server → ESP",
+      "description": "Mining job distribution",
+      "schema": {
+        "type": "object",
+        "required": ["type", "jobId", "algorithm", "data", "target", "difficulty"],
+        "properties": {
+          "type": { "const": "mining.job" },
+          "jobId": { "type": "string", "pattern": "^[a-f0-9]{8,32}$" },
+          "algorithm": { "const": "sha256" },
+          "data": { "type": "string", "pattern": "^[a-f0-9]+$" },
+          "target": { "type": "string", "pattern": "^[a-f0-9]+$" },
+          "difficulty": { "type": "number", "minimum": 1 }
+        }
+      }
+    },
+
+    "mining.share": {
+      "direction": "ESP → Server",
+      "description": "Share submission result",
+      "schema": {
+        "type": "object",
+        "required": ["type", "deviceId", "jobId", "nonce", "hash"],
+        "properties": {
+          "type": { "const": "mining.share" },
+          "deviceId": { "type": "string" },
+          "jobId": { "type": "string" },
+          "nonce": { "type": "string", "pattern": "^[a-f0-9]{8}$" },
+          "hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+
+    "mining.share.result": {
+      "direction": "Server → ESP",
+      "description": "Share validation result",
+      "schema": {
+        "type": "object",
+        "required": ["type", "jobId", "accepted", "reason"],
+        "properties": {
+          "type": { "const": "mining.share.result" },
+          "jobId": { "type": "string" },
+          "accepted": { "type": "boolean" },
+          "reason": { "type": "string", "enum": ["valid", "stale", "invalid", "duplicate"] }
+        }
+      }
+    },
+
+    "device.status": {
+      "direction": "Server → ESP",
+      "description": "Device status update (OLED use case)",
+      "schema": {
+        "type": "object",
+        "required": ["type", "system", "mining", "display"],
+        "properties": {
+          "type": { "const": "device.status" },
+          "system": {
+            "type": "object",
+            "required": ["mode", "rpc"],
+            "properties": {
+              "mode": { "enum": ["FALLBACK", "LIVE"] },
+              "rpc": { "enum": ["CONNECTED", "AUTH_FAILED", "UNREACHABLE", "DISABLED"] }
+            }
+          },
+          "mining": {
+            "type": "object",
+            "required": ["hashrate", "acceptedShares", "rejectedShares"],
+            "properties": {
+              "hashrate": { "type": "number", "minimum": 0 },
+              "acceptedShares": { "type": "integer", "minimum": 0 },
+              "rejectedShares": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "display": {
+            "type": "object",
+            "required": ["message", "color"],
+            "properties": {
+              "message": { "type": "string", "maxLength": 32 },
+              "color": { "enum": ["green", "yellow", "red", "blue", "white"] }
+            }
+          }
+        }
+      }
+    },
+
+    "device.error": {
+      "direction": "Server → ESP",
+      "description": "Error notification to device",
+      "schema": {
+        "type": "object",
+        "required": ["type", "code", "message"],
+        "properties": {
+          "type": { "const": "device.error" },
+          "code": { "type": "string", "enum": ["AUTH_INVALID", "VERSION_MISMATCH", "PAYLOAD_INVALID", "RATE_LIMIT"] },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  },
+
+  "stateMapping": {
+    "description": "Mapping from internal systemState to device protocol",
+    "systemStateToProtocol": {
+      "bitcoin.mode": {
+        "LIVE": "system.mode = LIVE",
+        "FALLBACK": "system.mode = FALLBACK"
+      },
+      "bitcoin.rpc": {
+        "CONNECTED": "system.rpc = CONNECTED",
+        "AUTH_FAILED": "system.rpc = AUTH_FAILED",
+        "UNREACHABLE": "system.rpc = UNREACHABLE",
+        "DISABLED": "system.rpc = DISABLED"
+      },
+      "bitcoin.mining": {
+        "LIVE_MINING": "mining.status = LIVE_MINING",
+        "SIMULATED_WORK_ONLY": "mining.status = SIMULATED_WORK_ONLY",
+        "IDLE": "mining.status = IDLE"
+      }
+    }
+  },
+
+  "versioning": {
+    "current": "1.0",
+    "compatibility": {
+      "min": "1.0",
+      "max": "1.0"
+    },
+    "upgradePolicy": "Version bump required for breaking changes to message schemas"
+  },
+
+  "security": {
+    "authentication": {
+      "method": "token-based",
+      "tokenIssuance": "device.registered response",
+      "tokenValidation": "required for all messages after registration"
+    },
+    "rateLimiting": {
+      "heartbeat": "max 1 per 5 seconds",
+      "share": "max 10 per second"
+    }
+  }
+}

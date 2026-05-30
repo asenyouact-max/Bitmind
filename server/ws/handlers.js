@@ -1,10 +1,13 @@
 // WEBSOCKET HANDLERS MODULE
+// Phase D: All device communication MUST go through deviceGateway
 // Only handles WebSocket events - delegates all state mutations to state module
 
+const crypto = require('crypto');
 const state = require('../state');
 const { BitcoinValidation } = require('../services/bitcoinValidation');
 const { sessionManager } = require('../services/sessionManager');
 const DeviceRegistry = require('../services/deviceRegistry');
+const deviceGateway = require('../gateway/deviceGateway');
 
 // Track active sockets per device to prevent duplicates
 const activeSockets = new Map(); // deviceId -> ws
@@ -43,18 +46,17 @@ const validation = {
 // WebSocket event handlers - ONLY READ/WRITE THROUGH STATE MODULE
 const handlers = {
   // Device registration handler with DeviceRegistry integration
+  // Phase D: Uses deviceGateway for protocol-compliant validation and messages
   register: (ws, data) => {
     const deviceId = data.deviceId;
     const ipAddress = ws._socket.remoteAddress;
 
-    // Production safety - validate input
-    if (!validation.isValidDeviceId(deviceId)) {
-      console.log("[WS] REGISTER_FAILED deviceId=null reason=INVALID_DEVICE_ID");
-      ws.send(JSON.stringify({
-        type: "error",
-        error: "INVALID_DEVICE_ID",
-        message: "Device ID is required"
-      }));
+    // Phase D: Validate registration using deviceGateway
+    const validation = deviceGateway.validateRegistration(data);
+    if (!validation.valid) {
+      console.log("[WS] REGISTER_FAILED deviceId=" + (deviceId || 'null') + " reason=" + validation.error);
+      const errorMsg = deviceGateway.createDeviceError('PAYLOAD_INVALID', validation.error);
+      ws.send(JSON.stringify(errorMsg));
       return false;
     }
 
@@ -72,12 +74,8 @@ const handlers = {
     // If still not registered, reject with structured error
     if (!DeviceRegistry.isRegistered(deviceId)) {
       console.log("[WS] DEVICE_REJECTED_UNREGISTERED deviceId=" + deviceId);
-      ws.send(JSON.stringify({
-        type: "error",
-        error: "DEVICE_NOT_REGISTERED",
-        action: "CALL /device/register FIRST",
-        message: "Device must be registered via REST API before WebSocket connection"
-      }));
+      const errorMsg = deviceGateway.createDeviceError('AUTH_INVALID', 'Device must be registered via REST API before WebSocket connection');
+      ws.send(JSON.stringify(errorMsg));
       return false;
     }
 
@@ -99,11 +97,10 @@ const handlers = {
     }
 
     try {
-      // Send ACK first
-      ws.send(JSON.stringify({
-        type: "ack",
-        status: "connected"
-      }));
+      // Phase D: Send protocol-compliant registration response
+      const token = crypto.randomBytes(16).toString('hex');
+      const regResponse = deviceGateway.createRegistrationResponse(deviceId, token);
+      ws.send(JSON.stringify(regResponse));
 
       // Create or update device through state module
       let device = state.getDevice(deviceId);
@@ -175,6 +172,7 @@ const handlers = {
   },
 
   // Heartbeat handler
+  // Phase D: Uses deviceGateway for protocol-compliant heartbeat ACK
   heartbeat: (ws, data) => {
     // Production safety - validate input
     if (!validation.isValidDeviceId(data.deviceId)) {
@@ -195,11 +193,9 @@ const handlers = {
       return false;
     }
 
-    // Send lightweight ACK
-    ws.send(JSON.stringify({
-      type: "heartbeat_ack",
-      timestamp: Date.now()
-    }));
+    // Phase D: Send protocol-compliant heartbeat ACK
+    const heartbeatAck = deviceGateway.createHeartbeatAck();
+    ws.send(JSON.stringify(heartbeatAck));
 
     return true;
   },
@@ -231,11 +227,13 @@ const handlers = {
       status: "mining"
     });
 
-    // Send ACK
-    ws.send(JSON.stringify({
-      type: "stats_ack",
-      status: "received"
-    }));
+    // Phase D: Send protocol-compliant device status (OLED use case)
+    const deviceStatus = deviceGateway.createDeviceStatus({
+      hashrate: data.hashrate,
+      acceptedShares: data.accepted,
+      rejectedShares: data.rejected
+    });
+    ws.send(JSON.stringify(deviceStatus));
 
     console.log("[WS] STATS_PROCESSED deviceId=" + data.deviceId + " hashrate=" + data.hashrate + " accepted=" + data.accepted + " rejected=" + data.rejected + " uptime=" + data.uptime);
 
@@ -303,15 +301,13 @@ const handlers = {
       timestamp: Date.now()
     });
 
-    // Send response to device
-    const response = {
-      type: "share_result",
-      status: isAccepted ? "accepted" : "rejected",
-      reward: isAccepted ? 1 : 0,
-      reason: validationResult.reason
-    };
-
-    ws.send(JSON.stringify(response));
+    // Phase D: Send protocol-compliant share result
+    const shareResult = deviceGateway.createShareResult(
+      data.jobId,
+      isAccepted,
+      validationResult.reason
+    );
+    ws.send(JSON.stringify(shareResult));
     console.log("[WS] SHARE_" + (isAccepted ? "ACCEPTED" : "REJECTED") + " deviceId=" + data.deviceId + " reason=" + validationResult.reason);
 
     return true;
