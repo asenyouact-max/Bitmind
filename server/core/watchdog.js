@@ -153,8 +153,9 @@ function triggerRestart(reason) {
   recordRestart(reason);
   
   // Log final state before restart
+  const state = systemState.getSnapshot();
   log('Restart would be triggered, but disabled for crash-free operation', 'WARN');
-  log(`Final state - RPC: ${rpcService.getState()}, Health failures: ${consecutiveHealthFailures}`);
+  log(`Final state - RPC: ${state.rpc.status}, Health failures: ${consecutiveHealthFailures}`);
   
   // DISABLED: process.exit(1) - let PM2 manage restarts externally
   // The server stays alive even if RPC/health fails - logs only
@@ -232,10 +233,11 @@ function stopWatchdog() {
  * Get watchdog status
  */
 function getStatus() {
+  const state = systemState.getSnapshot();
   return {
     running: watchdogInterval !== null,
     interval: WATCHDOG_INTERVAL_MS,
-    rpcState: rpcService.getState(),
+    rpcState: state.rpc,
     consecutiveHealthFailures,
     restartHistory: restartHistory.length,
     lastRestartTime: lastRestartTime ? new Date(lastRestartTime).toISOString() : null,

@@ -6,7 +6,7 @@
 
 const STATE = {
   rpc: {
-    status: 'unknown',
+    status: 'disconnected',
     blocks: null,
     latencyMs: null,
     error: null,

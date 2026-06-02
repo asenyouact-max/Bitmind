@@ -17,7 +17,7 @@ const WebSocket = require('ws');
 const crypto = require('crypto');
 const http = require('http');
 const axios = require('axios');
-const { rpcService, RPCError } = require('./services/rpc');
+const { rpcService } = require('./services/rpc');
 const systemState = require('./core/systemState');
 const rpcPoller = require('./core/rpcPoller');
 const { jobManager } = require('./services/jobManager');
@@ -924,8 +924,8 @@ async function startServer() {
 
     // Phase C.4: Read system state (no guessing logic)
     const systemState = getState();
-    console.log(`[SYSTEM] Bitcoin mode: ${systemState.bitcoin.mode}`);
-    console.log(`[SYSTEM] Bitcoin RPC: ${systemState.bitcoin.rpc}`);
+    // console.log(`[SYSTEM] Bitcoin mode: ${systemState.bitcoin.mode}`);
+    // console.log(`[SYSTEM] Bitcoin RPC: ${systemState.bitcoin.rpc}`);
 
     // Step 1: Start backend server - always binds, never exits
     console.log(`[SYSTEM] Starting backend HTTP server...`);
