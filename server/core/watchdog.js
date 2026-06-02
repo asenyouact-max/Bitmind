@@ -5,8 +5,7 @@
  */
 
 const axios = require('axios');
-const { rpcService } = require('../services/rpc');
-const { getState } = require('../state/systemState');
+const systemState = require('./systemState');
 
 // Configuration
 const WATCHDOG_INTERVAL_MS = 60000; // Phase B.3: 60 seconds (reduced from 15s to minimize RPC polling)
@@ -20,7 +19,6 @@ const CONSECUTIVE_FAILURES_THRESHOLD = 3;
 let watchdogInterval = null;
 let restartHistory = [];
 let consecutiveHealthFailures = 0;
-let consecutiveRpcFailures = 0;
 let lastRestartTime = 0;
 let isRestarting = false;
 
@@ -96,32 +94,11 @@ function recordRestart(reason) {
 }
 
 /**
- * Check RPC connectivity
- * Phase B.3: Skip polling if RPC is in AUTH_FAILED state
- */
-async function checkRpc() {
-  // Phase B.3: If RPC is in AUTH_FAILED state, skip polling entirely
-  if (rpcService.getState() === 'AUTH_FAILED') {
-    return false;
-  }
-
-  try {
-    await rpcService.getBlockchainInfo();
-    consecutiveRpcFailures = 0;
-    return true;
-  } catch (error) {
-    consecutiveRpcFailures++;
-    logFailure('RPC_CHECK_FAILED');
-    return false;
-  }
-}
-
-/**
  * Check local health endpoint
  */
 async function checkLocalHealth() {
   try {
-    const response = await axios.get(`http://localhost:${process.env.PORT || 3001}/health`, {
+    const response = await axios.get(`http://localhost:${process.env.PORT || 3001}/health/full`, {
       timeout: HEALTH_CHECK_TIMEOUT_MS
     });
 
@@ -177,7 +154,7 @@ function triggerRestart(reason) {
   
   // Log final state before restart
   log('Restart would be triggered, but disabled for crash-free operation', 'WARN');
-  log(`Final state - RPC failures: ${consecutiveRpcFailures}, Health failures: ${consecutiveHealthFailures}`);
+  log(`Final state - RPC: ${rpcService.getState()}, Health failures: ${consecutiveHealthFailures}`);
   
   // DISABLED: process.exit(1) - let PM2 manage restarts externally
   // The server stays alive even if RPC/health fails - logs only
@@ -195,7 +172,7 @@ async function watchdogCycle() {
 
   try {
     // Phase C.3: Read system state (observer-only)
-    const state = getState();
+    const state = systemState.getSnapshot();
 
     // Check local health
     const healthOk = await checkLocalHealth();
@@ -206,7 +183,7 @@ async function watchdogCycle() {
     const cycleTime = Date.now() - startTime;
 
     // Phase C.3: Structured summary log using systemState
-    log(`CYCLE_SUMMARY duration=${cycleTime}ms rpc=${state.bitcoin.rpc} mode=${state.bitcoin.mode} health=${healthOk ? 'OK' : 'FAIL'} ws=${wsOk ? 'OK' : 'FAIL'}`);
+    log(`CYCLE_SUMMARY duration=${cycleTime}ms rpc=${state.rpc.status} health=${healthOk ? 'OK' : 'FAIL'} ws=${wsOk ? 'OK' : 'FAIL'}`);
 
     // Determine if restart is needed (only health endpoint, never RPC)
     const healthCritical = consecutiveHealthFailures >= CONSECUTIVE_FAILURES_THRESHOLD;
@@ -258,7 +235,7 @@ function getStatus() {
   return {
     running: watchdogInterval !== null,
     interval: WATCHDOG_INTERVAL_MS,
-    consecutiveRpcFailures,
+    rpcState: rpcService.getState(),
     consecutiveHealthFailures,
     restartHistory: restartHistory.length,
     lastRestartTime: lastRestartTime ? new Date(lastRestartTime).toISOString() : null,

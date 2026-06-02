@@ -1,10 +1,15 @@
-// Load environment variables with graceful fallback
-try {
-  require('dotenv').config();
-  console.log('[BOOT] dotenv loaded successfully');
-} catch (e) {
-  console.warn('[BOOT] dotenv not loaded, continuing without .env');
-}
+// Load environment variables from explicit path
+const path = require('path');
+const dotenvPath = path.join(__dirname, '../../.env');
+require('dotenv').config({ path: dotenvPath });
+console.log('[BOOT] dotenv loaded from:', dotenvPath);
+
+// CRITICAL: Log environment values BEFORE rpcService initialization
+console.log('[BOOT] ENVIRONMENT VALUES:');
+console.log('[BOOT]   RPC_HOST:', process.env.RPC_HOST || 'MISSING');
+console.log('[BOOT]   RPC_PORT:', process.env.RPC_PORT || 'MISSING');
+console.log('[BOOT]   RPC_USER:', process.env.RPC_USER ? 'SET' : 'MISSING');
+console.log('[BOOT]   RPC_PASSWORD:', process.env.RPC_PASSWORD ? 'SET' : 'MISSING');
 
 const express = require('express');
 const cors = require('cors');
@@ -13,6 +18,8 @@ const crypto = require('crypto');
 const http = require('http');
 const axios = require('axios');
 const { rpcService, RPCError } = require('./services/rpc');
+const systemState = require('./core/systemState');
+const rpcPoller = require('./core/rpcPoller');
 const { jobManager } = require('./services/jobManager');
 const { shareValidator } = require('./services/shareValidator');
 const { sessionManager } = require('./services/sessionManager');
@@ -27,7 +34,7 @@ const { startWatchdog } = require('./core/watchdog');
 // Startup safety logs
 console.log('[BOOT] Bitmind server initializing...');
 console.log('[BOOT] Environment loaded:', process.env.NODE_ENV || 'development');
-console.log('[BOOT] RPC_HOST:', process.env.RPC_HOST || 'default (127.0.0.1)');
+console.log('[BOOT] RPC_HOST:', process.env.RPC_HOST || 'MISSING');
 console.log('[BOOT] PORT:', process.env.PORT || 'default (3001)');
 
 const app = express();
@@ -182,20 +189,44 @@ wsServer.on('connection', (ws, req) => {
       console.log("[WS] MESSAGE_PARSED type=" + data.type);
 
       // Route to appropriate handler using modular structure
+      // Phase D.1.1: Aligned to protocol v1 specification
       switch (data.type) {
-        case "register":
+        case "device.register":
+          console.log("[WS] MESSAGE_ROUTED type=device.register handler=register");
           wsHandlers.handlers.register(ws, data);
           break;
           
-        case "heartbeat":
+        case "device.heartbeat":
+          console.log("[WS] MESSAGE_ROUTED type=device.heartbeat handler=heartbeat");
           wsHandlers.handlers.heartbeat(ws, data);
           break;
           
-        case "share_found":
+        case "device_heartbeat":
+          // Legacy underscore format - normalize to device.heartbeat handler
+          console.log("[WS] MESSAGE_LEGACY_FORMAT type=device_heartbeat normalized=device.heartbeat");
+          wsHandlers.handlers.heartbeat(ws, data);
+          break;
+          
+        case "heartbeat":
+          // Plain heartbeat variant - normalize to device.heartbeat handler
+          console.log("[WS] MESSAGE_LEGACY_FORMAT type=heartbeat normalized=device.heartbeat");
+          wsHandlers.handlers.heartbeat(ws, data);
+          break;
+          
+        case "mining.share":
+          console.log("[WS] MESSAGE_ROUTED type=mining.share handler=shareFound");
+          wsHandlers.handlers.shareFound(ws, data);
+          break;
+          
+        case "mining_job":
+          // Legacy underscore format - normalize to mining.share handler
+          console.log("[WS] MESSAGE_LEGACY_FORMAT type=mining_job normalized=mining.share");
           wsHandlers.handlers.shareFound(ws, data);
           break;
           
         case "stats":
+          // Legacy stats message - map to heartbeat handler for telemetry
+          console.log("[WS] MESSAGE_ROUTED type=stats handler=stats");
           wsHandlers.handlers.stats(ws, data);
           break;
           
@@ -261,29 +292,48 @@ app.get('/health', (req, res) => {
 // Enhanced health endpoint for startup monitoring
 app.get('/health/full', async (req, res) => {
   try {
-    // Check Bitcoin Core RPC connection
-    let rpcStatus = 'disconnected';
-    try {
-      await callRpc('getblockchaininfo');
-      rpcStatus = 'connected';
-    } catch (error) {
-      rpcStatus = 'disconnected';
+    // Read from systemState (primary cache)
+    const state = systemState.getSnapshot();
+    let rpcStatus = state.rpc.status;
+    let rpcBlocks = state.rpc.blocks;
+    let rpcLatencyMs = state.rpc.latencyMs;
+
+    // Fallback: If state shows not connected, perform live check to prevent false negatives
+    if (rpcStatus !== 'connected') {
+      try {
+        const startTime = Date.now();
+        await rpcService.getBlockchainInfo();
+        const latency = Date.now() - startTime;
+        
+        // Live check succeeded - override state
+        rpcStatus = 'connected';
+        rpcLatencyMs = latency;
+        
+        // Update systemState with live result
+        const liveResult = await rpcService.getLiveRpcStatus();
+        rpcBlocks = liveResult.blocks;
+      } catch (liveError) {
+        // Live check failed - keep state as is (disconnected/auth_failed)
+        // No change needed
+      }
     }
 
     res.json({
-      bitcoin: 'running', // Assuming running if server is up
+      bitcoin: state.bitcoin,
       rpc: rpcStatus,
-      backend: 'running',
-      stratum: 'running',
-      frontend: 'unknown', // Backend can't directly check frontend
-      timestamp: new Date().toISOString()
+      rpcBlocks: rpcBlocks,
+      rpcLatencyMs: rpcLatencyMs,
+      backend: state.backend,
+      stratum: state.stratum,
+      frontend: 'unknown',
+      timestamp: new Date(state.timestamp).toISOString()
     });
   } catch (error) {
     res.status(500).json({
       bitcoin: 'unknown',
       rpc: 'error',
-      backend: 'running',
-      stratum: 'running',
+      backend: 'unknown',
+      stratum: 'unknown',
       frontend: 'unknown',
       error: error.message,
       timestamp: new Date().toISOString()
@@ -856,21 +906,13 @@ async function startServer() {
   isStarting = true;
 
   try {
-    // Step 0: Validate environment configuration with fallbacks
+    // Step 0: Validate environment configuration - no fallbacks
     console.log(`[SYSTEM] Validating environment configuration...`);
 
-    const RPC_HOST = process.env.RPC_HOST || '127.0.0.1';
+    const RPC_HOST = process.env.RPC_HOST;
     const RPC_PORT = process.env.RPC_PORT || '8332';
-    const RPC_USER = process.env.RPC_USER || 'bitcoin';
-    const RPC_PASSWORD = process.env.RPC_PASSWORD || 'bitcoin';
-
-    if (!process.env.RPC_HOST) {
-      console.warn('[WARN] RPC_HOST not set, using default: 127.0.0.1');
-    }
-
-    if (!process.env.RPC_PASSWORD) {
-      console.warn('[WARN] RPC_PASSWORD not set, using default');
-    }
+    const RPC_USER = process.env.RPC_USER;
+    const RPC_PASSWORD = process.env.RPC_PASSWORD;
 
     console.log(`[SYSTEM] ✅ Environment configuration valid`);
     console.log(`[SYSTEM] Bitmind backend starting...`);
@@ -907,6 +949,15 @@ async function startServer() {
     } catch (stratumErr) {
       console.warn(`[WARN] Stratum server not ready: ${stratumErr.message} - continuing without Stratum`);
     }
+
+    // Step 4: Initialize systemState
+    systemState.updateBitcoin('running');
+    systemState.updateBackend('running');
+    systemState.updateStratum('running');
+
+    // Step 5: Start RPC poller
+    console.log(`[SYSTEM] Starting RPC poller (5s interval)...`);
+    rpcPoller.start();
     
     // Step 4: Start lifecycle cleanup
     startLifecycleCleanup();

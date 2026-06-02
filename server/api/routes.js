@@ -218,14 +218,6 @@ router.get('/monitoring', (req, res) => {
     // WebSocket connection count
     const wsClientCount = wsServer ? wsServer.clients.size : 0;
 
-    // RPC health check
-    let rpcHealth = 'unknown';
-    try {
-      rpcHealth = 'connected';
-    } catch (e) {
-      rpcHealth = 'error';
-    }
-
     // Include device list with workerName
     const devicesList = allDevices.map(d => ({
       deviceId: d.deviceId,
@@ -368,78 +360,19 @@ router.get('/top-miners', (req, res) => {
   }
 });
 
-// System Status endpoint - comprehensive system observability
-router.get('/system/status', (req, res) => {
+// System Status endpoint - proxy to /health/full (single source of truth)
+router.get('/system/status', async (req, res) => {
   try {
-    const allDevices = state.getAllDevices();
-    const wsServer = global.wsServer;
-    const stratumReady = global.stratumServerReady || false;
+    // Proxy to /health/full for single source of truth
+    const healthResponse = await fetch(`http://localhost:${process.env.PORT || 3001}/health/full`);
+    const healthData = await healthResponse.json();
     
-    // Determine overall system status
-    let systemStatus = 'ok';
-    let rpcStatus = 'unknown';
-    
-    // Check RPC status
-    try {
-      rpcStatus = 'connected';
-    } catch (e) {
-      rpcStatus = 'disconnected';
-      systemStatus = 'degraded';
-    }
-    
-    // Check WebSocket status
-    const wsClientCount = wsServer ? wsServer.clients.size : 0;
-    if (wsClientCount === 0 && allDevices.length > 0) {
-      systemStatus = 'degraded';
-    }
-    
-    // Check Stratum status
-    if (!stratumReady) {
-      systemStatus = 'degraded';
-    }
-    
-    // Check if system is failed (no devices, no RPC, no stratum)
-    if (rpcStatus === 'disconnected' && !stratumReady && allDevices.length === 0) {
-      systemStatus = 'failed';
-    }
-    
-    // Get watchdog status if available
-    let watchdogStatus = null;
-    if (global.watchdog) {
-      try {
-        watchdogStatus = global.watchdog.getStatus();
-      } catch (e) {
-        // Watchdog not available
-      }
-    }
-    
-    res.json({
-      status: systemStatus,
-      rpc: rpcStatus,
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-      tailscale: 'active',
-      pm2: 'online',
-      components: {
-        websocket: wsClientCount > 0 ? 'active' : 'idle',
-        stratum: stratumReady ? 'online' : 'offline',
-        devices: {
-          total: allDevices.length,
-          online: allDevices.filter(d => d.status === 'online' || d.status === 'mining').length
-        }
-      },
-      watchdog: watchdogStatus
-    });
+    res.json(healthData);
   } catch (error) {
-    console.error('Error getting system status:', error);
     res.status(500).json({
-      status: 'failed',
-      rpc: 'unknown',
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-      tailscale: 'unknown',
-      pm2: 'unknown',
-      error: error.message
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });

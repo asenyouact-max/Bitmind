@@ -27,15 +27,6 @@ const STATE_MAPPING = {
     'UNKNOWN': 'FALLBACK' // Default to fallback if unknown
   },
   
-  // RPC state mapping
-  rpcState: {
-    'CONNECTED': 'CONNECTED',
-    'AUTH_FAILED': 'AUTH_FAILED',
-    'UNREACHABLE': 'UNREACHABLE',
-    'DISABLED': 'DISABLED',
-    'UNKNOWN': 'UNREACHABLE' // Default to unreachable if unknown
-  },
-  
   // Mining mode mapping
   miningMode: {
     'LIVE_MINING': 'LIVE_MINING',
@@ -145,12 +136,9 @@ function createDeviceStatus(miningStats = {}) {
   let displayMessage = 'SYSTEM INITIALIZING';
   let displayColor = 'white';
   
-  if (systemState.mode === 'LIVE' && systemState.rpc === 'CONNECTED') {
+  if (systemState.mode === 'LIVE') {
     displayMessage = 'MINING ACTIVE';
     displayColor = 'green';
-  } else if (systemState.rpc === 'AUTH_FAILED') {
-    displayMessage = 'AUTH FAILED';
-    displayColor = 'red';
   } else if (systemState.mode === 'FALLBACK') {
     displayMessage = 'FALLBACK MODE';
     displayColor = 'yellow';

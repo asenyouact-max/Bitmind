@@ -4,18 +4,15 @@
  */
 
 const axios = require('axios');
-const { rpcService } = require('../services/rpc');
 
 // Configuration
 const RESTART_COOLDOWN_MS = 60000; // 60 seconds minimum between restarts
 const CONSECUTIVE_HEALTH_FAILURES_THRESHOLD = 3;
-const CONSECUTIVE_RPC_FAILURES_THRESHOLD = 3;
 const MAX_RESTARTS_PER_HOUR = 10;
 
 // State
 let restartHistory = [];
 let consecutiveHealthFailures = 0;
-let consecutiveRpcFailures = 0;
 let lastRestartTime = 0;
 let isRestarting = false;
 
@@ -68,21 +65,6 @@ function recordRestart(reason) {
 }
 
 /**
- * Check RPC connectivity
- */
-async function checkRpc() {
-  try {
-    await rpcService.getBlockchainInfo();
-    consecutiveRpcFailures = 0;
-    return { ok: true, consecutiveFailures: 0 };
-  } catch (error) {
-    consecutiveRpcFailures++;
-    log(`RPC check failed (${consecutiveRpcFailures}/${CONSECUTIVE_RPC_FAILURES_THRESHOLD}): ${error.message}`, 'WARN');
-    return { ok: false, consecutiveFailures: consecutiveRpcFailures };
-  }
-}
-
-/**
  * Check local health endpoint
  */
 async function checkLocalHealth() {
@@ -110,18 +92,11 @@ async function checkLocalHealth() {
  * Determine if restart is needed based on current state
  */
 async function shouldRestart() {
-  const rpcCheck = await checkRpc();
+  // Get RPC state from source of truth (no independent RPC calls)
+  const rpcState = getRpcState();
   const healthCheck = await checkLocalHealth();
   
-  // Restart if RPC is critically down
-  if (!rpcCheck.ok && rpcCheck.consecutiveFailures >= CONSECUTIVE_RPC_FAILURES_THRESHOLD) {
-    return { 
-      shouldRestart: true, 
-      reason: `RPC critical failure (${rpcCheck.consecutiveFailures}/${CONSECUTIVE_RPC_FAILURES_THRESHOLD})` 
-    };
-  }
-  
-  // Restart if health is critically down
+  // Restart if health is critically down (only health endpoint, never RPC)
   if (!healthCheck.ok && healthCheck.consecutiveFailures >= CONSECUTIVE_HEALTH_FAILURES_THRESHOLD) {
     return { 
       shouldRestart: true, 
@@ -152,7 +127,7 @@ function triggerRestart(reason) {
   
   log('Initiating controlled restart...', 'WARN');
   log(`Restart reason: ${reason}`, 'WARN');
-  log(`Final state - RPC failures: ${consecutiveRpcFailures}, Health failures: ${consecutiveHealthFailures}`, 'WARN');
+  log(`Final state - Health failures: ${consecutiveHealthFailures}`, 'WARN');
   
   // DISABLED: process.exit(1) - let PM2 manage restarts externally
   // The server stays alive even if RPC/health fails - logs only
@@ -188,14 +163,13 @@ function getStatus() {
   return {
     isRestarting,
     consecutiveHealthFailures,
-    consecutiveRpcFailures,
+    rpcState: rpcService.getState(),
     lastRestartTime: lastRestartTime ? new Date(lastRestartTime).toISOString() : null,
     restartsLastHour: recentRestarts.length,
     canRestart: canRestart().allowed,
     cooldownRemaining: Math.max(0, RESTART_COOLDOWN_MS - (now - lastRestartTime)),
     thresholds: {
       health: CONSECUTIVE_HEALTH_FAILURES_THRESHOLD,
-      rpc: CONSECUTIVE_RPC_FAILURES_THRESHOLD,
       maxPerHour: MAX_RESTARTS_PER_HOUR,
       cooldown: RESTART_COOLDOWN_MS
     }
@@ -207,7 +181,6 @@ function getStatus() {
  */
 function resetCounters() {
   consecutiveHealthFailures = 0;
-  consecutiveRpcFailures = 0;
   log('Failure counters reset', 'INFO');
 }
 
@@ -217,6 +190,6 @@ module.exports = {
   shouldRestart,
   getStatus,
   resetCounters,
-  checkRpc,
+  getRpcState,
   checkLocalHealth
 };

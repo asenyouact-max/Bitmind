@@ -1,31 +1,16 @@
 const axios = require('axios');
-const { updateBitcoinState, updateRPCState } = require('../state/systemState');
+const systemState = require('../core/systemState');
 
 /**
- * Bitcoin Core RPC External Service Module
- * Architecture: RPC is an EXTERNAL service, not a critical dependency
- * States: CONNECTED, AUTH_FAILED, UNREACHABLE, DISABLED
- * Behavior: Non-critical, isolated, fallback-safe
- * Phase C: RPC is WRITER-ONLY - updates systemState, never decides system behavior
+ * Bitcoin Core RPC Service - Pure Function Model
+ * NO STATE MACHINE
+ * NO CACHING
+ * NO AUTO-RETRY
+ * Single source of truth for RPC connectivity
  */
 
 class RPCService {
   constructor() {
-    // Phase B.3: RPC Mode - EXTERNAL_SERVICE
-    this.RPC_MODE = "EXTERNAL_SERVICE";
-
-    // Explicit RPC states
-    this.RPC_STATES = {
-      CONNECTED: 'CONNECTED',
-      AUTH_FAILED: 'AUTH_FAILED',
-      UNREACHABLE: 'UNREACHABLE',
-      DISABLED: 'DISABLED'
-    };
-
-    // Current state
-    this.currentState = this.RPC_STATES.DISABLED;
-    this.lastStateChange = 0;
-
     // Production: RPC_HOST, RPC_USER, RPC_PASSWORD MUST be set in .env
     // No fallbacks - configuration is explicit
     this.config = {
@@ -36,18 +21,26 @@ class RPCService {
       timeout: parseInt(process.env.RPC_TIMEOUT) || 30000
     };
 
-    // Validate required configuration
+    // Runtime debug log (safe - does not print password)
+    console.log('[RPC BOOT]', {
+      host: this.config.host || 'MISSING',
+      port: this.config.port,
+      user: this.config.user ? 'SET' : 'MISSING',
+      password: this.config.password ? 'SET' : 'MISSING'
+    });
+    console.log('[RPC BOOT] HOST=' + (this.config.host || 'MISSING'));
+    console.log('[RPC BOOT] PORT=' + this.config.port);
+    console.log('[RPC BOOT] USER=' + (this.config.user || 'MISSING'));
+    console.log('[RPC BOOT] TIMEOUT=' + this.config.timeout);
+
+    // Validate required configuration - throw error if missing
     if (!this.config.host || !this.config.user || !this.config.password) {
-      this.setState(this.RPC_STATES.DISABLED);
-      console.log('[RPC] EXTERNAL_SERVICE mode - configuration incomplete, RPC disabled');
-    } else {
-      this.setState(this.RPC_STATES.UNREACHABLE);
-      console.log('[RPC] EXTERNAL_SERVICE mode - configuration loaded, attempting connection');
+      throw new Error('[RPC] Missing required environment variables (RPC_HOST, RPC_USER, RPC_PASSWORD)');
     }
 
     // Create axios instance with auth and timeout
     this.client = axios.create({
-      baseURL: `http://${this.config.host}:${this.config.port}`,
+      baseURL: `http://${this.config.host}:${this.config.port}/`,
       timeout: this.config.timeout,
       auth: {
         username: this.config.user,
@@ -57,258 +50,241 @@ class RPCService {
         'Content-Type': 'application/json'
       }
     });
-
-    // Phase B.3: Remove request/response interceptors to prevent log spam
-    // Only log state changes, not every request
-
-    // Phase 0.2: RPC failure state cache with 60s cooldown
-    this.failureState = {
-      lastFailureTime: 0,
-      lastFailureReason: null,
-      cooldownMs: 60000 // 60 seconds
-    };
-
-    // Phase B.1: Retry configuration with exponential backoff
-    this.retryConfig = {
-      maxRetries: 3,
-      baseDelayMs: 5000, // 5 seconds
-      maxDelayMs: 10000, // 10 seconds
-      backoffMultiplier: 1.5
-    };
   }
 
   /**
-   * Phase B.3: Set RPC state with state-change-only logging
-   * @param {string} newState - New RPC state
+   * Get live RPC status - PURE FUNCTION
+   * NO STATE, NO CACHING, NO RETRY
+   * @returns {Promise<Object>} RPC status object
    */
-  setState(newState) {
-    if (this.currentState !== newState) {
-      console.log(`[RPC] STATE_CHANGE from=${this.currentState} to=${newState} endpoint=${this.config.host}:${this.config.port}`);
-      this.currentState = newState;
-      this.lastStateChange = Date.now();
-    }
-  }
+  async getLiveRpcStatus() {
+    const startTime = Date.now();
 
-  /**
-   * Get current RPC state
-   * @returns {string} Current state
-   */
-  getState() {
-    return this.currentState;
-  }
-
-  /**
-   * Log RPC failure with cooldown to prevent spam
-   * @param {string} reason - Failure reason
-   * @param {string} endpoint - RPC endpoint
-   */
-  logFailure(reason, endpoint = 'unknown') {
-    const now = Date.now();
-    const timeSinceLastFailure = now - this.failureState.lastFailureTime;
-
-    // Only log if cooldown period has passed or failure reason changed
-    if (timeSinceLastFailure > this.failureState.cooldownMs ||
-        this.failureState.lastFailureReason !== reason) {
-      console.log(`[RPC] CONNECTION_FAILED reason=${reason} endpoint=${this.config.host}:${this.config.port} cooldown=${timeSinceLastFailure}ms`);
-      this.failureState.lastFailureTime = now;
-      this.failureState.lastFailureReason = reason;
-    }
-  }
-
-  /**
-   * Delay helper for retry backoff
-   * @param {number} ms - Milliseconds to delay
-   * @returns {Promise<void>}
-   */
-  async delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Calculate retry delay with exponential backoff
-   * @param {number} attempt - Current attempt number
-   * @returns {number} Delay in milliseconds
-   */
-  calculateRetryDelay(attempt) {
-    const delay = Math.min(
-      this.retryConfig.baseDelayMs * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
-      this.retryConfig.maxDelayMs
-    );
-    return Math.floor(delay);
-  }
-
-  /**
-   * Generic RPC helper function with retry backoff
-   * @param {string} method - Bitcoin Core RPC method name
-   * @param {Array} params - RPC parameters (default: [])
-   * @returns {Promise<any>} RPC result
-   */
-  async rpc(method, params = []) {
-    let lastError = null;
-
-    for (let attempt = 1; attempt <= this.retryConfig.maxRetries; attempt++) {
-      try {
-        const response = await this.client.post('', {
-          jsonrpc: '2.0',
-          id: Date.now(),
-          method: method,
-          params: params
-        });
-
-        // Handle JSON-RPC response
-        if (response.data.error) {
-          throw new RPCError(
-            response.data.error.message || 'Unknown RPC error',
-            response.data.error.code || -1
-          );
-        }
-
-        // Phase C.2: Update systemState on success (writer-only)
-        this.setState(this.RPC_STATES.CONNECTED);
-        updateBitcoinState({
-          rpc: "CONNECTED",
-          mode: "LIVE",
-          mining: "LIVE_MINING",
-          lastError: null
-        });
-        updateRPCState({
-          connected: true,
-          failureCount: 0
-        });
-        return response.data.result;
-      } catch (error) {
-        lastError = error;
-
-        // Classify error type
-        let errorType = 'UNKNOWN_ERROR';
-        if (error.code === 'ECONNREFUSED') {
-          errorType = 'NETWORK_UNREACHABLE';
-        } else if (error.code === 'ECONNRESET') {
-          errorType = 'CONNECTION_RESET';
-        } else if (error.response?.status === 401) {
-          errorType = 'AUTH_INVALID';
-        } else if (error.code === 'ETIMEDOUT') {
-          errorType = 'TIMEOUT';
-        } else if (error instanceof RPCError) {
-          errorType = 'RPC_ERROR';
-        }
-
-        // Phase B.3: Set state based on error type
-        if (errorType === 'AUTH_INVALID') {
-          this.setState(this.RPC_STATES.AUTH_FAILED);
-          // Phase C.2: Update systemState on AUTH failure
-          updateBitcoinState({
-            rpc: "AUTH_FAILED",
-            mode: "FALLBACK",
-            mining: "SIMULATED_WORK_ONLY",
-            lastError: error.message
-          });
-          updateRPCState({
-            connected: false,
-            failureCount: (this.failureState?.lastFailureReason === 'AUTH_INVALID' ? 0 : 1) + 1
-          });
-        } else if (errorType === 'NETWORK_UNREACHABLE' || errorType === 'CONNECTION_RESET') {
-          this.setState(this.RPC_STATES.UNREACHABLE);
-          // Phase C.2: Update systemState on network failure
-          updateBitcoinState({
-            rpc: "UNREACHABLE",
-            mode: "FALLBACK",
-            mining: "SIMULATED_WORK_ONLY",
-            lastError: error.message
-          });
-          updateRPCState({
-            connected: false,
-            failureCount: (this.failureState?.lastFailureReason === 'NETWORK_UNREACHABLE' ? 0 : 1) + 1
-          });
-        }
-
-        // Log failure with structured logging (cooldown enforced)
-        this.logFailure(errorType);
-
-        // If this is the last attempt, throw the error
-        if (attempt === this.retryConfig.maxRetries) {
-          if (errorType === 'NETWORK_UNREACHABLE') {
-            throw new RPCError('Bitcoin Core RPC unreachable - check if node is running', -1);
-          } else if (errorType === 'CONNECTION_RESET') {
-            throw new RPCError('RPC connection reset by node', -1);
-          } else if (errorType === 'AUTH_INVALID') {
-            throw new RPCError('RPC authentication failed - check credentials', -1);
-          } else if (errorType === 'TIMEOUT') {
-            throw new RPCError('RPC request timeout - node may be busy', -1);
-          } else if (error instanceof RPCError) {
-            throw error;
-          } else {
-            throw new RPCError(`RPC communication error: ${error.message}`, -1);
-          }
-        }
-
-        // Calculate delay and wait before retry
-        const delay = this.calculateRetryDelay(attempt);
-        // Phase B.3: Remove retry spam logs - only state changes are logged
-        await this.delay(delay);
-      }
-    }
-
-    // This should never be reached, but just in case
-    throw lastError || new RPCError('RPC failed after retries', -1);
-  }
-
-  /**
-   * Test RPC connection
-   * @returns {Promise<boolean>} Connection status
-   */
-  async testConnection() {
     try {
-      await this.rpc('getblockchaininfo');
-      return true;
+      console.log('[RPC TRACE] calling ' + this.config.host + ':' + this.config.port);
+      const response = await this.client.post('', {
+        jsonrpc: '1.0',
+        id: 'bitmind',
+        method: 'getblockchaininfo',
+        params: []
+      });
+
+      const latency = Date.now() - startTime;
+      console.log('[RPC TRACE] status=' + response.status);
+      console.log('[RPC TRACE] hasData=' + !!response.data);
+
+      // Check if response has data
+      if (!response.data) {
+        console.log('[RPC TRACE] RETURN disconnected - no response data');
+        const result = {
+          status: 'disconnected',
+          blocks: null,
+          latencyMs: latency,
+          error: 'No response data',
+          timestamp: Date.now()
+        };
+        systemState.updateRpc(result);
+        return result;
+      }
+
+      // Handle JSON-RPC error (only if HTTP status is 200)
+      if (response.data.error) {
+        if (response.data.error.code === -1) {
+          console.log('[RPC TRACE] RETURN auth_failed - JSON-RPC error code -1');
+          const result = {
+            status: 'auth_failed',
+            blocks: null,
+            latencyMs: latency,
+            error: response.data.error.message || 'Authentication failed',
+            timestamp: Date.now()
+          };
+          systemState.updateRpc(result);
+          return result;
+        }
+        console.log('[RPC TRACE] RETURN disconnected - JSON-RPC error: ' + (response.data.error.message || 'RPC error'));
+        const result = {
+          status: 'disconnected',
+          blocks: null,
+          latencyMs: latency,
+          error: response.data.error.message || 'RPC error',
+          timestamp: Date.now()
+        };
+        systemState.updateRpc(result);
+        return result;
+      }
+
+      // Check if result exists
+      console.log('[RPC TRACE] hasResult=' + !!response.data.result);
+      if (!response.data.result) {
+        console.log('[RPC TRACE] RETURN disconnected - no result in response');
+        const result = {
+          status: 'disconnected',
+          blocks: null,
+          latencyMs: latency,
+          error: 'No result in response',
+          timestamp: Date.now()
+        };
+        systemState.updateRpc(result);
+        return result;
+      }
+
+      // Success
+      console.log('[RPC TRACE] blocks=' + (response.data.result.blocks || null));
+      console.log('[RPC TRACE] RETURN connected');
+      const result = {
+        status: 'connected',
+        blocks: response.data.result.blocks || null,
+        latencyMs: latency,
+        error: null,
+        timestamp: Date.now()
+      };
+      systemState.updateRpc(result);
+      return result;
     } catch (error) {
-      console.error('RPC connection test failed:', error.message);
-      return false;
+      const latency = Date.now() - startTime;
+      console.log('[RPC TRACE] caught error: ' + error.message);
+      console.log('[RPC TRACE] error.code=' + (error.code || 'none'));
+      console.log('[RPC TRACE] error.response.status=' + (error.response?.status || 'none'));
+
+      // Classify error type - ONLY HTTP 401/403 is auth failure
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        console.log('[RPC TRACE] RETURN auth_failed - HTTP ' + error.response.status);
+        const result = {
+          status: 'auth_failed',
+          blocks: null,
+          latencyMs: latency,
+          error: 'Authentication failed (HTTP ' + error.response.status + ')',
+          timestamp: Date.now()
+        };
+        systemState.updateRpc(result);
+        return result;
+      }
+
+      if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET') {
+        console.log('[RPC TRACE] RETURN disconnected - connection refused');
+        const result = {
+          status: 'disconnected',
+          blocks: null,
+          latencyMs: latency,
+          error: 'Connection refused',
+          timestamp: Date.now()
+        };
+        systemState.updateRpc(result);
+        return result;
+      }
+
+      if (error.code === 'ETIMEDOUT') {
+        console.log('[RPC TRACE] RETURN disconnected - timeout');
+        const result = {
+          status: 'disconnected',
+          blocks: null,
+          latencyMs: latency,
+          error: 'Connection timeout',
+          timestamp: Date.now()
+        };
+        systemState.updateRpc(result);
+        return result;
+      }
+
+      console.log('[RPC TRACE] RETURN disconnected - ' + (error.message || 'Unknown error'));
+      const result = {
+        status: 'disconnected',
+        blocks: null,
+        latencyMs: latency,
+        error: error.message || 'Unknown error',
+        timestamp: Date.now()
+      };
+      systemState.updateRpc(result);
+      return result;
     }
   }
 
   /**
-   * Get blockchain info
+   * Get blockchain info - for mining operations
    * @returns {Promise<Object>} Blockchain information
    */
   async getBlockchainInfo() {
-    return await this.rpc('getblockchaininfo');
+    const response = await this.client.post('', {
+      jsonrpc: '1.0',
+      id: 'bitmind',
+      method: 'getblockchaininfo',
+      params: []
+    });
+
+    // Check if response has data
+    if (!response.data) {
+      throw new Error('No response data from RPC');
+    }
+
+    // Handle JSON-RPC error
+    if (response.data.error) {
+      throw new Error(response.data.error.message || 'RPC error');
+    }
+
+    // Check if result exists
+    if (!response.data.result) {
+      throw new Error('No result in RPC response');
+    }
+
+    return response.data.result;
   }
 
   /**
-   * Get block template
+   * Get block template - for mining operations
    * @param {Object} rules - Block template rules
    * @returns {Promise<Object>} Block template
    */
   async getBlockTemplate(rules = { rules: ['segwit'] }) {
-    return await this.rpc('getblocktemplate', [rules]);
+    const response = await this.client.post('', {
+      jsonrpc: '1.0',
+      id: 'bitmind',
+      method: 'getblocktemplate',
+      params: [rules]
+    });
+
+    if (response.data.error) {
+      throw new Error(response.data.error.message || 'RPC error');
+    }
+
+    return response.data.result;
   }
 
   /**
-   * Get network info
+   * Get network info - for mining operations
    * @returns {Promise<Object>} Network information
    */
   async getNetworkInfo() {
-    return await this.rpc('getnetworkinfo');
+    const response = await this.client.post('', {
+      jsonrpc: '1.0',
+      id: 'bitmind',
+      method: 'getnetworkinfo',
+      params: []
+    });
+
+    if (response.data.error) {
+      throw new Error(response.data.error.message || 'RPC error');
+    }
+
+    return response.data.result;
   }
 
   /**
-   * Get mining info
+   * Get mining info - for mining operations
    * @returns {Promise<Object>} Mining information
    */
   async getMiningInfo() {
-    return await this.rpc('getmininginfo');
-  }
-}
+    const response = await this.client.post('', {
+      jsonrpc: '1.0',
+      id: 'bitmind',
+      method: 'getmininginfo',
+      params: []
+    });
 
-/**
- * Custom RPC Error class
- */
-class RPCError extends Error {
-  constructor(message, code) {
-    super(message);
-    this.name = 'RPCError';
-    this.code = code;
+    if (response.data.error) {
+      throw new Error(response.data.error.message || 'RPC error');
+    }
+
+    return response.data.result;
   }
 }
 
@@ -316,6 +292,5 @@ class RPCError extends Error {
 const rpcService = new RPCService();
 
 module.exports = {
-  rpcService,
-  RPCError
+  rpcService
 };

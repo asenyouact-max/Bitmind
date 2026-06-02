@@ -11,12 +11,13 @@ module.exports = {
     restart_delay: 3000,
     max_restarts: 10,
     min_uptime: '5s',
+    env_file: '/opt/Bitmind/.env',
     env: {
       NODE_ENV: 'production',
       PORT: 3001,
       STRATUM_PORT: 3333
-      // RPC_* variables must be set in /opt/Bitmind/.env file
-      // DO NOT hardcode secrets here - they should come from .env
+      // RPC_* variables are loaded from /opt/Bitmind/.env via env_file
+      // DO NOT hardcode secrets here
     },
     error_file: '/opt/Bitmind/logs/bitmind-error.log',
     out_file: '/opt/Bitmind/logs/bitmind-out.log',

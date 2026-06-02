@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 NGINX_ROOT="/usr/share/nginx/html"
-FRONTEND_DIR="/opt/bitmind-backend/bitmind-ui"
+FRONTEND_DIR="/opt/Bitmind/bitmind-ui"
 
 echo "📋 CHECKING DEPLOYMENT INTEGRITY..."
 echo ""
