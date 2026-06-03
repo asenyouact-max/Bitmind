@@ -11,6 +11,14 @@ console.log('[BOOT]   RPC_PORT:', process.env.RPC_PORT || 'MISSING');
 console.log('[BOOT]   RPC_USER:', process.env.RPC_USER ? 'SET' : 'MISSING');
 console.log('[BOOT]   RPC_PASSWORD:', process.env.RPC_PASSWORD ? 'SET' : 'MISSING');
 
+// HARD FAIL: If RPC_HOST is missing after dotenv load, .env file is not accessible
+if (!process.env.RPC_HOST) {
+  console.error('[FATAL] RPC_HOST is not set after dotenv load. .env file may be missing or inaccessible.');
+  console.error('[FATAL] Expected .env path:', dotenvPath);
+  console.error('[FATAL] Current working directory:', process.cwd());
+  process.exit(1);
+}
+
 const express = require('express');
 const cors = require('cors');
 const WebSocket = require('ws');
