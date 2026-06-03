@@ -23,8 +23,6 @@ const rpcPoller = require('./core/rpcPoller');
 const { jobManager } = require('./services/jobManager');
 const { shareValidator } = require('./services/shareValidator');
 const { sessionManager } = require('./services/sessionManager');
-const state = require('./state');
-const { getState } = require('./state/systemState');
 const wsHandlers = require('./ws/handlers');
 const apiRoutes = require('./api/routes');
 const miningServices = require('./services/mining');
@@ -514,20 +512,18 @@ app.get('/api/shares', (req, res) => {
 // Phase C.5: No computation, no inference, no fallback logic - pure state dump
 app.get('/api/health', (req, res) => {
   try {
-    const systemState = getState();
+    const state = systemState.getSnapshot();
 
     res.json({
       status: 'ok',
       websocket: wsServer.clients.size > 0 ? 'active' : 'idle',
       stratum: stratumServerReady ? 'active' : 'inactive',
       // Phase C.5: Pure state dump from systemState
-      bitcoin: systemState.bitcoin,
-      rpc: systemState.rpc,
-      system: {
-        uptime: state.system?.uptime ?? 0,
-        connectedMiners: state.system?.connectedMiners ?? 0,
-        totalHashrate: state.system?.totalHashrate ?? 0
-      }
+      bitcoin: state.bitcoin,
+      rpc: state.rpc,
+      backend: state.backend,
+      stratum: state.stratum,
+      timestamp: new Date(state.timestamp).toISOString()
     });
   } catch (error) {
     console.error('Error getting API health:', error);
@@ -923,9 +919,9 @@ async function startServer() {
     console.log(`[SYSTEM] Platform: ${process.platform}`);
 
     // Phase C.4: Read system state (no guessing logic)
-    const systemState = getState();
-    // console.log(`[SYSTEM] Bitcoin mode: ${systemState.bitcoin.mode}`);
-    // console.log(`[SYSTEM] Bitcoin RPC: ${systemState.bitcoin.rpc}`);
+    const state = systemState.getSnapshot();
+    // console.log(`[SYSTEM] Bitcoin mode: ${state.bitcoin.mode}`);
+    // console.log(`[SYSTEM] Bitcoin RPC: ${state.bitcoin.rpc}`);
 
     // Step 1: Start backend server - always binds, never exits
     console.log(`[SYSTEM] Starting backend HTTP server...`);
@@ -977,7 +973,7 @@ async function startServer() {
     console.log(`[SYSTEM] ========================================`);
     console.log(`[SYSTEM] Backend: http://0.0.0.0:${PORT}`);
     console.log(`[SYSTEM] Stratum: 0.0.0.0:${STRATUM_PORT}`);
-    console.log(`[SYSTEM] Bitcoin: ${systemState.bitcoin.mode}`);
+    console.log(`[SYSTEM] Bitcoin: ${systemState.bitcoin}`);
     console.log(`[SYSTEM] Miners can now connect to 192.168.1.12:${STRATUM_PORT}`);
     console.log(`[SYSTEM] System status: http://0.0.0.0:${PORT}/api/system/status`);
     console.log(`[SYSTEM] Health check: http://0.0.0.0:${PORT}/health`);
