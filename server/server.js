@@ -23,6 +23,7 @@ const rpcPoller = require('./core/rpcPoller');
 const { jobManager } = require('./services/jobManager');
 const { shareValidator } = require('./services/shareValidator');
 const { sessionManager } = require('./services/sessionManager');
+const state = require('./state');
 const wsHandlers = require('./ws/handlers');
 const apiRoutes = require('./api/routes');
 const miningServices = require('./services/mining');
