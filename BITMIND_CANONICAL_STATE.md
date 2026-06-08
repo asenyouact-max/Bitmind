@@ -217,10 +217,12 @@ Requirements:
 
 Old ESP Firmware:
 
+[ ] Architecture defined
 [ ] Stable
 
 OLED Firmware:
 
+[ ] Architecture defined
 [ ] Stable
 
 Requirements:
@@ -287,6 +289,34 @@ Requirements:
 [ ] Mobile friendly
 
 ==============================================================================
+FIRMWARE ARCHITECTURE
+==============================================================================
+
+STATUS: FINAL
+
+Authority Document:
+
+BITMIND_FIRMWARE_ARCHITECTURE.md
+
+Firmware Variants:
+
+1. Legacy ESP Firmware (no screen)
+2. OLED Firmware (with screen)
+
+Shared Architecture:
+
+- Device Identity: EFuse MAC-based
+- Worker Identity: Canonical model
+- Configuration: Preferences NV storage
+- Protocol: Bitmind Device Protocol v1
+- Mining: Real SHA256
+- WebSocket: SSL to getbitmind.com
+
+All firmware implementation must follow BITMIND_FIRMWARE_ARCHITECTURE.md
+
+No feature additions without architecture update.
+
+==============================================================================
 KNOWN COMPLETED FEATURES
 ==============================================================================
 
@@ -298,6 +328,7 @@ Update ONLY when verified.
 [ ] QR onboarding functional
 [ ] Device registration working
 [ ] Worker name storage working
+[ ] Firmware architecture defined
 
 ==============================================================================
 WORKER IDENTITY MODEL
