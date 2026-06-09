@@ -272,6 +272,7 @@ void connectWebSocket() {
   Serial.println("[WS] Port: " + String(WS_PORT));
   
   webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
+  webSocket.setInsecure();  // Required for Let's Encrypt certificates (ESP32 Core 3.3.8 doesn't include ISRG Root X1)
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
