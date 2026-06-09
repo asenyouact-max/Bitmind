@@ -3,13 +3,52 @@
 **Date:** 2026-06-09  
 **Firmware:** bitmind_legacy_v1.ino  
 **ESP32 Core Version:** 3.3.8  
+**WebSockets Library:** Links2004/arduinoWebSockets  
 **Issue:** Repeated WStype_DISCONNECTED without WStype_CONNECTED or WStype_ERROR
+
+---
+
+## WebSockets Library API Analysis
+
+### Library: Links2004/arduinoWebSockets
+
+**Repository:** https://github.com/Links2004/arduinoWebSockets
+
+**SSL Backend for ESP32 Core 3.3.8:**
+- Uses BearSSL (SSL_BARESSL)
+- NOT axTLS (older ESP32 cores used axTLS)
+- Different API than other WebSocketsClient implementations
+
+### beginSSL() Signature (BearSSL)
+
+```cpp
+void beginSSL(const char * host, uint16_t port, const char * url, const uint8_t * fingerprint, const char * protocol);
+```
+
+**Parameters:**
+- `host`: Server hostname
+- `port`: Server port (443 for SSL)
+- `url`: WebSocket path (e.g., "/ws")
+- `fingerprint`: SHA-1 fingerprint of server certificate (NULL to disable validation)
+- `protocol`: WebSocket protocol (default "arduino")
+
+### Available SSL Methods
+
+1. **beginSSL()** - Basic SSL with optional fingerprint validation
+2. **beginSslWithCA()** - SSL with custom CA certificate
+3. **beginSslWithBundle()** - SSL with certificate bundle (ESP32 Core >= 3.0.4)
+
+### IMPORTANT: No setInsecure() Method
+
+**The Links2004/arduinoWebSockets library does NOT have a `setInsecure()` method.**
+
+This method exists in other WebSocketsClient implementations (e.g., ESPAsyncWebServer) but NOT in the Links2004 library.
 
 ---
 
 ## Current Implementation
 
-**Location:** `esp32_firmware/bitmind_legacy_v1/bitmind_legacy_v1.ino` (lines 269-277)
+**Location:** `esp32_firmware/bitmind_legacy_v1/bitmind_legacy_v1.ino` (lines 269-280)
 
 ```cpp
 void connectWebSocket() {
@@ -17,7 +56,10 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
+  // Use beginSSL with NULL fingerprint to bypass certificate validation
+  // ESP32 Arduino Core 3.3.8 uses BearSSL which doesn't include Let's Encrypt root certificates
+  // NULL fingerprint disables certificate validation (development/testing only)
+  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, (const uint8_t *)NULL);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
@@ -64,12 +106,12 @@ Device repeatedly receives `WStype_DISCONNECTED` without ever receiving `WStype_
 
 **SSL Certificate Validation Failure**
 
-The ESP32 Arduino Core 3.3.8 uses the axTLS library for SSL/TLS. When `beginSSL()` is called without certificate configuration, the library attempts to validate the server certificate against its built-in root certificate store.
+The ESP32 Arduino Core 3.3.8 uses BearSSL for SSL/TLS. When `beginSSL()` is called without a fingerprint parameter (or with default empty fingerprint), the library attempts to validate the server certificate against its built-in root certificate store.
 
 **Let's Encrypt Certificates:**
 - Let's Encrypt uses ISRG Root X1 certificate
-- This certificate is NOT included in ESP32 Arduino Core 3.3.8's default certificate store
-- The SSL handshake fails silently during certificate validation
+- This certificate is NOT included in ESP32 Arduino Core 3.3.8's default BearSSL certificate store
+- The SSL handshake fails during certificate validation
 - WebSocketsClient library interprets this as a disconnection
 
 **Why No WStype_ERROR:**
@@ -86,9 +128,9 @@ The ESP32 Arduino Core 3.3.8 uses the axTLS library for SSL/TLS. When `beginSSL(
 
 ## ESP32 Arduino Core 3.3.8 Certificate Limitations
 
-### Built-in Root Certificates
+### Built-in Root Certificates (BearSSL)
 
-ESP32 Arduino Core 3.3.8 includes a limited set of root certificates:
+ESP32 Arduino Core 3.3.8 includes a limited set of root certificates in BearSSL:
 - DigiCert Global Root CA
 - DigiCert High Assurance EV Root CA
 - Google Internet Authority G2
@@ -103,16 +145,16 @@ ESP32 Arduino Core 3.3.8 includes a limited set of root certificates:
 ### Certificate Store Size
 
 - ESP32 has limited flash space for certificates
-- Default certificate store is ~20KB
+- Default BearSSL certificate store is ~20KB
 - Adding custom certificates requires partition scheme changes
 
 ---
 
 ## Solution Options
 
-### Option 1: setInsecure() (Quickest Fix)
+### Option 1: NULL Fingerprint (Quickest Fix - APPLIED)
 
-**Description:** Disable SSL certificate validation
+**Description:** Pass NULL as fingerprint parameter to disable certificate validation
 
 **Implementation:**
 ```cpp
@@ -121,8 +163,8 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
-  webSocket.setInsecure();  // DISABLE CERTIFICATE VALIDATION
+  // NULL fingerprint disables certificate validation
+  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, (const uint8_t *)NULL);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
@@ -133,6 +175,7 @@ void connectWebSocket() {
 - No certificate management required
 - Works with any certificate authority
 - Minimal code change
+- Uses correct API for Links2004 library
 
 **Cons:**
 - **SECURITY RISK:** Vulnerable to man-in-the-middle attacks
@@ -146,7 +189,7 @@ void connectWebSocket() {
 
 ### Option 2: Custom Certificate Configuration (Production-Ready)
 
-**Description:** Add Let's Encrypt root certificate to ESP32
+**Description:** Add Let's Encrypt root certificate using beginSslWithCA()
 
 **Step 1: Download ISRG Root X1 Certificate**
 
@@ -176,8 +219,8 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, "", "isrgrootx1");
-  webSocket.setCACert((const uint8_t*)isrgrootx1_der, sizeof(isrgrootx1_der));
+  // Use beginSslWithCA for proper certificate validation
+  webSocket.beginSslWithCA(WS_HOST, WS_PORT, WS_PATH, (const char *)isrgrootx1_der);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
@@ -188,6 +231,7 @@ void connectWebSocket() {
 - Production-ready
 - No security vulnerabilities
 - Complies with best practices
+- Uses correct API for Links2004 library
 
 **Cons:**
 - Requires certificate management
@@ -199,43 +243,46 @@ void connectWebSocket() {
 
 ---
 
-### Option 3: HTTP Fallback with Upgrade (Alternative)
+### Option 3: Certificate Bundle (Alternative Production Fix)
 
-**Description:** Use HTTP connection with WebSocket upgrade
+**Description:** Use beginSslWithBundle() for ESP32 Core >= 3.0.4
 
 **Implementation:**
 ```cpp
+#include "cert_bundle.h"
+
 void connectWebSocket() {
   Serial.println("[WS] Connecting to WebSocket...");
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  // Use HTTP instead of SSL (not recommended for production)
-  webSocket.begin(WS_HOST, WS_PORT, WS_PATH);
+  // Use certificate bundle for multiple CAs
+  webSocket.beginSslWithBundle(WS_HOST, WS_PORT, WS_PATH, cert_bundle, cert_bundle_size);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
 ```
 
 **Pros:**
-- No certificate issues
-- Simple implementation
+- Supports multiple certificates
+- Production-ready
+- More flexible than single CA
 
 **Cons:**
-- **SECURITY RISK:** Unencrypted connection
-- Credentials transmitted in plaintext
-- Not acceptable for production
-- Requires backend to support non-SSL WebSocket
+- Larger flash footprint
+- More complex certificate management
 
-**Use Case:** Local development only
+**Use Case:** Production deployment with multiple CAs
 
 ---
 
-## Recommended Fix for Phase A
+## Applied Fix
 
 ### Immediate Fix (Development/Testing)
 
-Add `setInsecure()` to bypass certificate validation:
+**Status:** APPLIED
+
+**Change:** Modified `connectWebSocket()` to pass NULL fingerprint
 
 ```cpp
 void connectWebSocket() {
@@ -243,8 +290,10 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
-  webSocket.setInsecure();  // Add this line
+  // Use beginSSL with NULL fingerprint to bypass certificate validation
+  // ESP32 Arduino Core 3.3.8 uses BearSSL which doesn't include Let's Encrypt root certificates
+  // NULL fingerprint disables certificate validation (development/testing only)
+  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, (const uint8_t *)NULL);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
@@ -252,7 +301,7 @@ void connectWebSocket() {
 
 ### Production Fix (Post-Phase A)
 
-Implement custom certificate configuration with ISRG Root X1.
+Implement custom certificate configuration with ISRG Root X1 using `beginSslWithCA()`.
 
 ---
 
@@ -266,7 +315,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     case WStype_DISCONNECTED:
       Serial.println("[WS] Disconnected");
       Serial.println("[WS] Disconnect reason: SSL handshake likely failed");
-      Serial.println("[WS] Fix: Add webSocket.setInsecure() or configure certificates");
+      Serial.println("[WS] Fix: NULL fingerprint passed to beginSSL()");
       wsConnected = false;
       break;
       
@@ -318,9 +367,9 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 ## Verification Steps
 
-### After Adding setInsecure()
+### After Applying NULL Fingerprint Fix
 
-1. Flash firmware with `setInsecure()` added
+1. Flash firmware with NULL fingerprint fix
 2. Monitor serial output
 3. Expected sequence:
    ```
@@ -342,7 +391,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 ## Security Considerations
 
-### setInsecure() Risks
+### NULL Fingerprint Risks
 
 **Man-in-the-Middle Attacks:**
 - Attacker can intercept and modify traffic
@@ -368,35 +417,40 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 ### Root Cause
 
-ESP32 Arduino Core 3.3.8 does not include Let's Encrypt root certificates. SSL handshake fails silently, causing immediate disconnection without error event.
+ESP32 Arduino Core 3.3.8 uses BearSSL which does not include Let's Encrypt root certificates. SSL handshake fails silently, causing immediate disconnection without error event.
 
-### Immediate Fix
+### Incorrect Fix Attempted
 
-Add `webSocket.setInsecure()` after `webSocket.beginSSL()`.
+`setInsecure()` does NOT exist in the Links2004/arduinoWebSockets library. This method exists in other WebSocketsClient implementations but not in this library.
+
+### Correct Fix Applied
+
+Pass NULL as the fingerprint parameter to `beginSSL()` to disable certificate validation.
 
 ### Production Fix
 
-Implement custom certificate configuration with ISRG Root X1 certificate.
+Implement custom certificate configuration with ISRG Root X1 using `beginSslWithCA()`.
 
 ### Recommendation
 
-For Phase A hardware validation, use `setInsecure()` with clear documentation of security implications. For production deployment, implement proper certificate configuration.
+For Phase A hardware validation, use NULL fingerprint with clear documentation of security implications. For production deployment, implement proper certificate configuration using `beginSslWithCA()`.
 
 ---
 
-## Files to Modify
+## Files Modified
 
 **File:** `esp32_firmware/bitmind_legacy_v1/bitmind_legacy_v1.ino`
 
 **Function:** `connectWebSocket()` (line 269)
 
-**Change:** Add `webSocket.setInsecure();` after line 274
+**Change:** Modified `beginSSL()` call to pass NULL fingerprint
 
 ---
 
 ## Testing Checklist
 
-- [ ] Add setInsecure() to connectWebSocket()
+- [x] Remove incorrect setInsecure() call
+- [x] Apply NULL fingerprint to beginSSL()
 - [ ] Flash firmware to ESP32
 - [ ] Monitor serial output for WStype_CONNECTED
 - [ ] Verify device.register message sent

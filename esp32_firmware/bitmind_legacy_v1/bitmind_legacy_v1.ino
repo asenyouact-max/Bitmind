@@ -271,8 +271,10 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH);
-  webSocket.setInsecure();  // Required for Let's Encrypt certificates (ESP32 Core 3.3.8 doesn't include ISRG Root X1)
+  // Use beginSSL with NULL fingerprint to bypass certificate validation
+  // ESP32 Arduino Core 3.3.8 uses BearSSL which doesn't include Let's Encrypt root certificates
+  // NULL fingerprint disables certificate validation (development/testing only)
+  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, (const uint8_t *)NULL);
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
