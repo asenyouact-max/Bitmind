@@ -97,6 +97,7 @@ Both firmware variants share the following core architecture:
 - `mining.job` - Mining job distribution
 - `mining.share` - Share submission
 - `mining.share.result` - Share validation result
+- `mining_stats` - Device telemetry data
 - `device.status` - Status update (OLED)
 - `device.error` - Error notification
 
@@ -310,20 +311,22 @@ Both firmware variants share the following core architecture:
 
 **Job Reception:**
 - Message type: `mining.job`
-- Parse: jobId, data, target, difficulty
+- Parse: jobId, sessionId, height, target, pseudoTarget, pseudoMining, createdAt, version, previousblockhash, merkleroot, nbits, ntime, deviceContext
+- Extract deviceContext: nonceStart, nonceEnd, extranonce1
 - Store job in memory
 - Set mining flag to true
-- Reset nonce to 0
+- Set nonce to deviceContext.nonceStart
 - Log job details to Serial
 
 **Mining Loop:**
 - Check mining flag
 - Check interval (100ms)
-- Build block header with current nonce
+- Build block header with individual Bitcoin fields (version, previousblockhash, merkleroot, ntime, nbits, nonce)
 - Double SHA256 hash
 - Compare hash to target
 - If valid → Submit share
 - Increment nonce
+- Check if nonce > deviceContext.nonceEnd → Stop mining, wait for new job
 - Calculate hashrate
 - Log progress every 1000 hashes
 
@@ -344,8 +347,14 @@ Both firmware variants share the following core architecture:
 **Job Update:**
 - New `mining.job` message
 - Replace current job
-- Reset nonce
+- Reset nonce to deviceContext.nonceStart
 - Continue mining
+
+**Telemetry:**
+- Message type: `mining_stats`
+- Send every 10 seconds
+- Payload: deviceId, hashrate, acceptedShares, rejectedShares, uptime
+- Rate limit: Max 1 per 10 seconds
 
 ### Heartbeat Workflow
 
@@ -606,37 +615,42 @@ Both firmware variants share the following core architecture:
 
 ### QR Onboarding Flow
 
+**Phase A Scope:**
+- QR Code → Open AP Mode Setup Portal
+- NOT backend-driven device configuration
+- device.config remains Phase B
+
 **QR Code Content:**
 ```
-https://getbitmind.com/setup?device=esp32-A1B2C3D4E5F6
+http://192.168.4.1
 ```
 
 **QR Display:**
 - Shown on OLED in AP mode
 - Scannable by mobile phone
-- Opens setup page in browser
-- Pre-fills device ID
+- Opens AP mode web portal in browser
+- Simplifies setup for mobile users
 
-**Setup Page (Backend):**
-- URL: `https://getbitmind.com/setup`
-- Parameters: device ID
+**Setup Page (AP Mode):**
+- URL: `http://192.168.4.1`
 - Form fields: WiFi SSID, Password, Worker, Wallet
-- Submit via API to backend
-- Backend sends configuration to device via WebSocket
-
-**Alternative Flow (Direct):**
-- User opens setup page manually
-- Enters device ID manually
-- Fills form
-- Backend sends config to device
-
-**Configuration Delivery:**
-- Backend sends `device.config` message via WebSocket
+- Submit via HTTP POST to `/save`
 - Device saves to Preferences
 - Device reboots
 - Device connects to user's WiFi
 
-**Status:** PROPOSED for Phase A completion
+**Alternative Flow (Direct):**
+- User opens browser manually to `http://192.168.4.1`
+- Fills form
+- Device saves to Preferences
+- Device reboots
+
+**Status:** IMPLEMENTED for Phase A (QR code opens AP mode web portal)
+
+**Phase B Scope (NOT IMPLEMENTED):**
+- Backend-driven configuration via device.config message
+- Backend setup page at `https://getbitmind.com/setup`
+- Backend sends configuration to device via WebSocket
 
 ### WiFi Provisioning
 
@@ -730,21 +744,23 @@ https://getbitmind.com/setup?device=esp32-A1B2C3D4E5F6
 
 **Job Reception:**
 - Message type: `mining.job`
-- Parse: jobId, data, target, difficulty
+- Parse: jobId, sessionId, height, target, pseudoTarget, pseudoMining, createdAt, version, previousblockhash, merkleroot, nbits, ntime, deviceContext
+- Extract deviceContext: nonceStart, nonceEnd, extranonce1
 - Store job in memory
 - Set mining flag to true
-- Reset nonce to 0
+- Set nonce to deviceContext.nonceStart
 - Log job details to Serial
 - Update OLED: "Mining"
 
 **Mining Loop:**
 - Check mining flag
 - Check interval (100ms)
-- Build block header with current nonce
+- Build block header with individual Bitcoin fields (version, previousblockhash, merkleroot, ntime, nbits, nonce)
 - Double SHA256 hash
 - Compare hash to target
 - If valid → Submit share
 - Increment nonce
+- Check if nonce > deviceContext.nonceEnd → Stop mining, wait for new job
 - Calculate hashrate
 - Log progress every 1000 hashes
 - Update OLED every 5 seconds
@@ -774,9 +790,15 @@ https://getbitmind.com/setup?device=esp32-A1B2C3D4E5F6
 **Job Update:**
 - New `mining.job` message
 - Replace current job
-- Reset nonce
+- Reset nonce to deviceContext.nonceStart
 - Continue mining
 - Update OLED
+
+**Telemetry:**
+- Message type: `mining_stats`
+- Send every 10 seconds
+- Payload: deviceId, hashrate, acceptedShares, rejectedShares, uptime
+- Rate limit: Max 1 per 10 seconds
 
 ### Heartbeat Workflow
 

@@ -1,9 +1,9 @@
 {
   "protocolVersion": "1.0",
   "protocolName": "Bitmind Device Protocol",
-  "description": "Immutable communication contract between ESP32 devices and Bitmind backend",
-  "status": "STABLE",
-  "lastUpdated": "2026-05-30",
+  "description": "Immutable communication contract between ESP32 devices and Bitmind backend - FROZEN for Phase A",
+  "status": "FROZEN",
+  "lastUpdated": "2026-06-09",
 
   "messageTypes": {
     "device.register": {
@@ -84,17 +84,34 @@
 
     "mining.job": {
       "direction": "Server → ESP",
-      "description": "Mining job distribution",
+      "description": "Mining job distribution with full block template data",
       "schema": {
         "type": "object",
-        "required": ["type", "jobId", "algorithm", "data", "target", "difficulty"],
+        "required": ["type", "jobId", "sessionId", "height", "target", "pseudoTarget", "pseudoMining", "createdAt", "version", "previousblockhash", "merkleroot", "nbits", "ntime", "deviceContext"],
         "properties": {
           "type": { "const": "mining.job" },
-          "jobId": { "type": "string", "pattern": "^[a-f0-9]{8,32}$" },
-          "algorithm": { "const": "sha256" },
-          "data": { "type": "string", "pattern": "^[a-f0-9]+$" },
+          "jobId": { "type": "string", "format": "uuid" },
+          "sessionId": { "type": "string", "format": "uuid" },
+          "height": { "type": "number" },
           "target": { "type": "string", "pattern": "^[a-f0-9]+$" },
-          "difficulty": { "type": "number", "minimum": 1 }
+          "pseudoTarget": { "type": ["string", "null"], "pattern": "^[a-f0-9]+$" },
+          "pseudoMining": { "type": "boolean" },
+          "createdAt": { "type": "integer" },
+          "version": { "type": "number" },
+          "previousblockhash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "merkleroot": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "nbits": { "type": "number" },
+          "ntime": { "type": "integer" },
+          "deviceContext": {
+            "type": "object",
+            "required": ["sessionId", "nonceStart", "nonceEnd", "extranonce1"],
+            "properties": {
+              "sessionId": { "type": "string", "format": "uuid" },
+              "nonceStart": { "type": "number" },
+              "nonceEnd": { "type": "number" },
+              "extranonce1": { "type": "string", "pattern": "^[a-f0-9]+$" }
+            }
+          }
         }
       }
     },
@@ -126,6 +143,24 @@
           "jobId": { "type": "string" },
           "accepted": { "type": "boolean" },
           "reason": { "type": "string", "enum": ["valid", "stale", "invalid", "duplicate"] }
+        }
+      }
+    },
+
+    "mining_stats": {
+      "direction": "ESP → Server",
+      "description": "Device telemetry data",
+      "schema": {
+        "type": "object",
+        "required": ["type", "deviceId", "hashrate", "acceptedShares", "rejectedShares", "uptime"],
+        "properties": {
+          "type": { "const": "mining_stats" },
+          "deviceId": { "type": "string" },
+          "hashrate": { "type": "number", "minimum": 0 },
+          "acceptedShares": { "type": "integer", "minimum": 0 },
+          "rejectedShares": { "type": "integer", "minimum": 0 },
+          "uptime": { "type": "integer", "minimum": 0 },
+          "jobId": { "type": "string", "format": "uuid" }
         }
       }
     },
@@ -220,7 +255,8 @@
     },
     "rateLimiting": {
       "heartbeat": "max 1 per 5 seconds",
-      "share": "max 10 per second"
+      "share": "max 10 per second",
+      "mining_stats": "max 1 per 10 seconds"
     }
   }
 }
