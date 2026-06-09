@@ -109,7 +109,8 @@ Preferences preferences;
 
 String generateDeviceId() {
   uint8_t mac[6];
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  // ESP32 Core 3.3.8 uses esp_efuse_mac_get_default() instead of esp_read_mac()
+  esp_efuse_mac_get_default(mac);
   
   // Format: esp32-{upper4hex}{lower8hex}
   char deviceIdStr[32];
@@ -271,10 +272,11 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  // Use beginSSL with NULL fingerprint to bypass certificate validation
+  // Use beginSSL with empty fingerprint to bypass certificate validation
   // ESP32 Arduino Core 3.3.8 uses BearSSL which doesn't include Let's Encrypt root certificates
-  // NULL fingerprint disables certificate validation (development/testing only)
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, (const uint8_t *)NULL);
+  // Empty fingerprint ("") disables certificate validation (development/testing only)
+  // Links2004 WebSockets API: beginSSL(host, port, url, fingerprint, protocol)
+  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, "");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }

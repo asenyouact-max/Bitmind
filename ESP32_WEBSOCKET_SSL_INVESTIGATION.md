@@ -22,15 +22,17 @@
 ### beginSSL() Signature (BearSSL)
 
 ```cpp
-void beginSSL(const char * host, uint16_t port, const char * url, const uint8_t * fingerprint, const char * protocol);
+void beginSSL(const char * host, uint16_t port, const char * url = "/", const char * fingerprint = "", const char * protocol = "arduino");
 ```
 
 **Parameters:**
 - `host`: Server hostname
 - `port`: Server port (443 for SSL)
 - `url`: WebSocket path (e.g., "/ws")
-- `fingerprint`: SHA-1 fingerprint of server certificate (NULL to disable validation)
+- `fingerprint`: SHA-1 fingerprint of server certificate as string (empty string "" to disable validation)
 - `protocol`: WebSocket protocol (default "arduino")
+
+**IMPORTANT:** The fingerprint parameter is a `const char *` string, NOT a `const uint8_t *` binary array.
 
 ### Available SSL Methods
 
@@ -152,9 +154,9 @@ ESP32 Arduino Core 3.3.8 includes a limited set of root certificates in BearSSL:
 
 ## Solution Options
 
-### Option 1: NULL Fingerprint (Quickest Fix - APPLIED)
+### Option 1: Empty Fingerprint String (Quickest Fix - APPLIED)
 
-**Description:** Pass NULL as fingerprint parameter to disable certificate validation
+**Description:** Pass empty string "" as fingerprint parameter to disable certificate validation
 
 **Implementation:**
 ```cpp
@@ -163,8 +165,8 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  // NULL fingerprint disables certificate validation
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, (const uint8_t *)NULL);
+  // Empty fingerprint disables certificate validation
+  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, "");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
@@ -176,6 +178,7 @@ void connectWebSocket() {
 - Works with any certificate authority
 - Minimal code change
 - Uses correct API for Links2004 library
+- Compile-valid for ESP32 Core 3.3.8
 
 **Cons:**
 - **SECURITY RISK:** Vulnerable to man-in-the-middle attacks
@@ -282,7 +285,7 @@ void connectWebSocket() {
 
 **Status:** APPLIED
 
-**Change:** Modified `connectWebSocket()` to pass NULL fingerprint
+**Change:** Modified `connectWebSocket()` to pass empty string "" as fingerprint
 
 ```cpp
 void connectWebSocket() {
@@ -290,10 +293,11 @@ void connectWebSocket() {
   Serial.println("[WS] Host: " + String(WS_HOST));
   Serial.println("[WS] Port: " + String(WS_PORT));
   
-  // Use beginSSL with NULL fingerprint to bypass certificate validation
+  // Use beginSSL with empty fingerprint to bypass certificate validation
   // ESP32 Arduino Core 3.3.8 uses BearSSL which doesn't include Let's Encrypt root certificates
-  // NULL fingerprint disables certificate validation (development/testing only)
-  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, (const uint8_t *)NULL);
+  // Empty fingerprint ("") disables certificate validation (development/testing only)
+  // Links2004 WebSockets API: beginSSL(host, port, url, fingerprint, protocol)
+  webSocket.beginSSL(WS_HOST, WS_PORT, WS_PATH, "");
   webSocket.onEvent(webSocketEvent);
   webSocket.setReconnectInterval(RECONNECT_INTERVAL);
 }
@@ -419,13 +423,15 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
 
 ESP32 Arduino Core 3.3.8 uses BearSSL which does not include Let's Encrypt root certificates. SSL handshake fails silently, causing immediate disconnection without error event.
 
-### Incorrect Fix Attempted
+### Incorrect Fixes Attempted
 
-`setInsecure()` does NOT exist in the Links2004/arduinoWebSockets library. This method exists in other WebSocketsClient implementations but not in this library.
+1. `setInsecure()` does NOT exist in the Links2004/arduinoWebSockets library. This method exists in other WebSocketsClient implementations but not in this library.
+
+2. Passing `(const uint8_t *)NULL` as fingerprint fails with invalid conversion because the fingerprint parameter is `const char *` string, not `const uint8_t *` binary array.
 
 ### Correct Fix Applied
 
-Pass NULL as the fingerprint parameter to `beginSSL()` to disable certificate validation.
+Pass empty string "" as the fingerprint parameter to `beginSSL()` to disable certificate validation.
 
 ### Production Fix
 
@@ -433,7 +439,7 @@ Implement custom certificate configuration with ISRG Root X1 using `beginSslWith
 
 ### Recommendation
 
-For Phase A hardware validation, use NULL fingerprint with clear documentation of security implications. For production deployment, implement proper certificate configuration using `beginSslWithCA()`.
+For Phase A hardware validation, use empty string "" as fingerprint with clear documentation of security implications. For production deployment, implement proper certificate configuration using `beginSslWithCA()`.
 
 ---
 
@@ -441,16 +447,21 @@ For Phase A hardware validation, use NULL fingerprint with clear documentation o
 
 **File:** `esp32_firmware/bitmind_legacy_v1/bitmind_legacy_v1.ino`
 
-**Function:** `connectWebSocket()` (line 269)
+**Function:** `connectWebSocket()` (line 270)
 
-**Change:** Modified `beginSSL()` call to pass NULL fingerprint
+**Change:** Modified `beginSSL()` call to pass empty string "" as fingerprint
+
+**Function:** `generateDeviceId()` (line 110)
+
+**Change:** Replaced `esp_read_mac()` with `esp_efuse_mac_get_default()` for ESP32 Core 3.3.8 compatibility
 
 ---
 
 ## Testing Checklist
 
 - [x] Remove incorrect setInsecure() call
-- [x] Apply NULL fingerprint to beginSSL()
+- [x] Apply empty string "" fingerprint to beginSSL()
+- [x] Fix generateDeviceId() for ESP32 Core 3.3.8
 - [ ] Flash firmware to ESP32
 - [ ] Monitor serial output for WStype_CONNECTED
 - [ ] Verify device.register message sent
