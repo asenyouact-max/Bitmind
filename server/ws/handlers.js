@@ -40,6 +40,15 @@ const validation = {
            typeof stats.accepted === 'number' &&
            typeof stats.rejected === 'number' &&
            typeof stats.uptime === 'number';
+  },
+
+  isValidMiningStats: (stats) => {
+    return stats &&
+           stats.deviceId &&
+           typeof stats.hashrate === 'number' &&
+           typeof stats.acceptedShares === 'number' &&
+           typeof stats.rejectedShares === 'number' &&
+           typeof stats.uptime === 'number';
   }
 };
 
@@ -63,6 +72,7 @@ const handlers = {
     // Check if device is registered in DeviceRegistry
     const isRegistered = DeviceRegistry.isRegistered(deviceId);
     const isDevClient = DeviceRegistry.isDevClient(deviceId);
+    const isEsp32Device = deviceId && deviceId.startsWith('esp32-');
 
     // Dev mode: allow web-client-* devices with warning
     if (!isRegistered && isDevClient) {
@@ -71,7 +81,17 @@ const handlers = {
       DeviceRegistry.register(deviceId, { deviceType: 'web-client' });
     }
 
-    // If still not registered, reject with structured error
+    // MODEL A: ESP32 devices auto-register on first connection
+    if (!isRegistered && isEsp32Device) {
+      console.log("[WS] DEVICE_AUTO_REGISTERED deviceId=" + deviceId + " reason=ESP32_SELF_REGISTRATION");
+      DeviceRegistry.register(deviceId, { 
+        deviceType: data.deviceType || 'miner',
+        workerName: data.workerName,
+        walletAddress: data.walletAddress
+      });
+    }
+
+    // If still not registered (non-ESP32, non-dev-client), reject
     if (!DeviceRegistry.isRegistered(deviceId)) {
       console.log("[WS] DEVICE_REJECTED_UNREGISTERED deviceId=" + deviceId);
       const errorMsg = deviceGateway.createDeviceError('AUTH_INVALID', 'Device must be registered via REST API before WebSocket connection');
@@ -200,7 +220,7 @@ const handlers = {
     return true;
   },
 
-  // Stats handler for miner telemetry
+  // Stats handler for miner telemetry (legacy)
   stats: (ws, data) => {
     console.log("[WS] STATS_RECEIVED deviceId=" + data.deviceId);
 
@@ -236,6 +256,46 @@ const handlers = {
     ws.send(JSON.stringify(deviceStatus));
 
     console.log("[WS] STATS_PROCESSED deviceId=" + data.deviceId + " hashrate=" + data.hashrate + " accepted=" + data.accepted + " rejected=" + data.rejected + " uptime=" + data.uptime);
+
+    return true;
+  },
+
+  // mining_stats handler for protocol v1 compliance
+  mining_stats: (ws, data) => {
+    console.log("[WS] MINING_STATS_RECEIVED deviceId=" + data.deviceId);
+
+    // Production safety - validate input
+    if (!validation.isValidMiningStats(data)) {
+      console.log("[WS] MINING_STATS_FAILED deviceId=" + (data.deviceId || 'null') + " reason=INVALID_MINING_STATS");
+      return false;
+    }
+
+    // Get device through state module
+    const device = state.getDevice(data.deviceId);
+    if (!device) {
+      console.log("[WS] MINING_STATS_FROM_UNKNOWN deviceId=" + (data.deviceId || 'null'));
+      return false;
+    }
+
+    // Update device telemetry through state module (protocol v1 field names)
+    state.mutations.updateDevice(data.deviceId, {
+      lastSeen: Date.now(),
+      hashrate: data.hashrate,
+      acceptedShares: data.acceptedShares,
+      rejectedShares: data.rejectedShares,
+      uptime: data.uptime,
+      status: "mining"
+    });
+
+    // Phase D: Send protocol-compliant device status (OLED use case)
+    const deviceStatus = deviceGateway.createDeviceStatus({
+      hashrate: data.hashrate,
+      acceptedShares: data.acceptedShares,
+      rejectedShares: data.rejectedShares
+    });
+    ws.send(JSON.stringify(deviceStatus));
+
+    console.log("[WS] MINING_STATS_PROCESSED deviceId=" + data.deviceId + " hashrate=" + data.hashrate + " acceptedShares=" + data.acceptedShares + " rejectedShares=" + data.rejectedShares + " uptime=" + data.uptime);
 
     return true;
   },

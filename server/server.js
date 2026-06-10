@@ -236,7 +236,13 @@ wsServer.on('connection', (ws, req) => {
           console.log("[WS] MESSAGE_ROUTED type=stats handler=stats");
           wsHandlers.handlers.stats(ws, data);
           break;
-          
+
+        case "mining_stats":
+          // Protocol v1 mining_stats message
+          console.log("[WS] MESSAGE_ROUTED type=mining_stats handler=mining_stats");
+          wsHandlers.handlers.mining_stats(ws, data);
+          break;
+
         default:
           console.log("[WS] MESSAGE_UNKNOWN type=" + data.type + " reason=UNHANDLED_TYPE");
       }
