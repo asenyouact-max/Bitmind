@@ -109,8 +109,8 @@ Preferences preferences;
 
 String generateDeviceId() {
   uint8_t mac[6];
-  // ESP32 Core 3.3.8 uses esp_efuse_mac_get_default() instead of esp_read_mac()
-  esp_efuse_mac_get_default(mac);
+  // ESP32 Core 3.3.8 uses esp_read_mac() from esp_wifi.h
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
   
   // Format: esp32-{upper4hex}{lower8hex}
   char deviceIdStr[32];
