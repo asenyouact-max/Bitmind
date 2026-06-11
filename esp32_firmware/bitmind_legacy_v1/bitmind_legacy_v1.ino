@@ -108,15 +108,11 @@ Preferences preferences;
 // ============================================================================
 
 String generateDeviceId() {
-  uint8_t mac[6];
-  // ESP32 Core 3.3.8 uses esp_read_mac() from esp_wifi.h
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
-  
-  // Format: esp32-{upper4hex}{lower8hex}
+  uint64_t chipid = ESP.getEfuseMac();
+
   char deviceIdStr[32];
-  snprintf(deviceIdStr, sizeof(deviceIdStr), "esp32-%02X%02X%02X%02X%02X%02X",
-           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-  
+  sprintf(deviceIdStr, "esp32-%04X", (uint16_t)(chipid & 0xFFFF));
+
   return String(deviceIdStr);
 }
 
