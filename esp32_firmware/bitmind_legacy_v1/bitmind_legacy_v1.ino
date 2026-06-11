@@ -252,6 +252,9 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     case WStype_CONNECTED:
       Serial.println("[WS] Connected");
       wsConnected = true;
+      // Delay to allow backend welcome message to be received before sending registration
+      // This prevents message concatenation race condition
+      delay(500);
       sendDeviceRegister();
       break;
       
