@@ -281,8 +281,15 @@ void connectWebSocket() {
 }
 
 void sendWebSocketMessage(const char *message) {
+  Serial.println("[WS] SEND_ATTEMPT payload_length=" + String(strlen(message)));
+  Serial.println("[WS] SEND_ATTEMPT wsConnected_before=" + String(wsConnected ? "true" : "false"));
+  
   if (wsConnected) {
-    webSocket.sendTXT(message);
+    bool sendResult = webSocket.sendTXT(message);
+    Serial.println("[WS] SEND_RESULT sendTXT_return=" + String(sendResult ? "true" : "false"));
+    Serial.println("[WS] SEND_RESULT wsConnected_after=" + String(wsConnected ? "true" : "false"));
+  } else {
+    Serial.println("[WS] SEND_FAILED reason=NOT_CONNECTED");
   }
 }
 
