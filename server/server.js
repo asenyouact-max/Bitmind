@@ -167,6 +167,10 @@ wsServer.on('connection', (ws, req) => {
   // Initialize socket liveness tracking
   ws.isAlive = true;
   
+  // Initialize message sequence counter for forensic tracing
+  ws.messageSequence = 0;
+  ws.connectionTimestamp = Date.now();
+  
   // Send welcome message
   ws.send(JSON.stringify({
     type: "welcome", 
@@ -180,6 +184,12 @@ wsServer.on('connection', (ws, req) => {
   
   // Handle incoming messages with robust error handling
   ws.on('message', (msg) => {
+    // Forensic: Log raw message before any processing
+    ws.messageSequence = (ws.messageSequence || 0) + 1;
+    const timeSinceConnect = Date.now() - ws.connectionTimestamp;
+    const msgStr = msg.toString();
+    console.log("[WS] RAW_MESSAGE seq=" + ws.messageSequence + " time_since_connect_ms=" + timeSinceConnect + " length=" + msgStr.length + " content=" + msgStr);
+    
     try {
       // Use core utilities for safe parsing
       const data = coreUtils.messageParsing.safeParse(msg);
