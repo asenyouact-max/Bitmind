@@ -251,6 +251,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
       // Delay to allow backend welcome message to be received before sending registration
       // This prevents message concatenation race condition
       delay(500);
+      Serial.println("[TRACE] ABOUT_TO_CALL_SEND_DEVICE_REGISTER");
       sendDeviceRegister();
       break;
       
@@ -298,6 +299,9 @@ void sendWebSocketMessage(const char *message) {
 // ============================================================================
 
 void sendDeviceRegister() {
+  Serial.println("[TRACE] SEND_DEVICE_REGISTER_ENTERED");
+  
+  Serial.println("[TRACE] BUILDING_REGISTER_PAYLOAD");
   String message = "{\"type\":\"device.register\",";
   message += "\"deviceId\":\"" + deviceId + "\",";
   message += "\"deviceType\":\"" + String(DEVICE_TYPE) + "\",";
@@ -305,8 +309,10 @@ void sendDeviceRegister() {
   message += "\"capabilities\":{\"oled\":false,\"wifi\":true,\"stratum\":true}}";
   message += "}";
   
+  Serial.println("[TRACE] REGISTER_PAYLOAD_READY length=" + String(message.length()));
   Serial.println("[PROTO] Sending device.register");
   sendWebSocketMessage(message.c_str());
+  Serial.println("[TRACE] REGISTER_SEND_FUNCTION_RETURNED");
 }
 
 void sendHeartbeat() {
