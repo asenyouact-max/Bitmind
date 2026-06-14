@@ -306,7 +306,7 @@ void sendDeviceRegister() {
   message += "\"deviceId\":\"" + deviceId + "\",";
   message += "\"deviceType\":\"" + String(DEVICE_TYPE) + "\",";
   message += "\"firmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\",";
-  message += "\"capabilities\":{\"oled\":false,\"wifi\":true,\"stratum\":true}}";
+  message += "\"capabilities\":{\"oled\":false,\"wifi\":true,\"stratum\":true}";
   message += "}";
   
   Serial.println("[TRACE] REGISTER_PAYLOAD_READY length=" + String(message.length()));
