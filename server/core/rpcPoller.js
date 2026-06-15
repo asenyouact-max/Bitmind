@@ -5,7 +5,7 @@
  */
 
 const { rpcService } = require('../services/rpc');
-const systemState = require('./systemState');
+const systemState = require('../state/systemState');
 
 const POLL_INTERVAL_MS = 5000; // 5 seconds
 let pollInterval = null;

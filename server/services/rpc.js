@@ -1,5 +1,5 @@
 const axios = require('axios');
-const systemState = require('../core/systemState');
+const systemState = require('../state/systemState');
 
 /**
  * Bitcoin Core RPC Service - Pure Function Model

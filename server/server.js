@@ -26,7 +26,7 @@ const crypto = require('crypto');
 const http = require('http');
 const axios = require('axios');
 const { rpcService } = require('./services/rpc');
-const systemState = require('./core/systemState');
+const systemState = require('./state/systemState');
 const rpcPoller = require('./core/rpcPoller');
 const { jobManager } = require('./services/jobManager');
 const { shareValidator } = require('./services/shareValidator');
@@ -316,7 +316,7 @@ app.get('/health', (req, res) => {
 app.get('/health/full', async (req, res) => {
   try {
     // Read from systemState (primary cache)
-    const state = systemState.getSnapshot();
+    const state = systemState.getState();
     let rpcStatus = state.rpc.status;
     let rpcBlocks = state.rpc.blocks;
     let rpcLatencyMs = state.rpc.latencyMs;
@@ -537,7 +537,7 @@ app.get('/api/shares', (req, res) => {
 // Phase C.5: No computation, no inference, no fallback logic - pure state dump
 app.get('/api/health', (req, res) => {
   try {
-    const state = systemState.getSnapshot();
+    const state = systemState.getState();
 
     res.json({
       status: 'ok',
