@@ -111,7 +111,7 @@ String generateDeviceId() {
   uint64_t chipid = ESP.getEfuseMac();
 
   char deviceIdStr[32];
-  sprintf(deviceIdStr, "esp32-%04X", (uint16_t)(chipid & 0xFFFF));
+  sprintf(deviceIdStr, "esp32-%04x", (uint16_t)(chipid & 0xFFFF));
 
   return String(deviceIdStr);
 }
