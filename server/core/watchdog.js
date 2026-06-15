@@ -5,7 +5,7 @@
  */
 
 const axios = require('axios');
-const systemState = require('./systemState');
+const systemState = require('../state/systemState');
 
 // Configuration
 const WATCHDOG_INTERVAL_MS = 60000; // Phase B.3: 60 seconds (reduced from 15s to minimize RPC polling)

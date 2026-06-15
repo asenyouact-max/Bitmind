@@ -122,6 +122,14 @@ function getState() {
   return systemState;
 }
 
+/**
+ * Get state snapshot (compatibility wrapper for legacy code)
+ * @returns {Object} Complete system state
+ */
+function getSnapshot() {
+  return systemState;
+}
+
 module.exports = {
   systemState,
   updateBitcoinState,
@@ -129,5 +137,6 @@ module.exports = {
   updateSystemState,
   updateDevicesState,
   updateRpc,
-  getState
+  getState,
+  getSnapshot
 };
