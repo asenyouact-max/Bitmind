@@ -113,7 +113,9 @@ String generateDeviceId() {
   char deviceIdStr[32];
   sprintf(deviceIdStr, "esp32-%04x", (uint16_t)(chipid & 0xFFFF));
 
-  return String(deviceIdStr);
+  String result = String(deviceIdStr);
+  Serial.println("[DEVICE_ID] GENERATED=" + result);
+  return result;
 }
 
 // ============================================================================
@@ -300,6 +302,7 @@ void sendWebSocketMessage(const char *message) {
 
 void sendDeviceRegister() {
   Serial.println("[TRACE] SEND_DEVICE_REGISTER_ENTERED");
+  Serial.println("[DEVICE_ID] REGISTER_PAYLOAD=" + deviceId);
   
   Serial.println("[TRACE] BUILDING_REGISTER_PAYLOAD");
   String message = "{\"type\":\"device.register\",";
