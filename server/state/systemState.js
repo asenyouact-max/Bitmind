@@ -34,11 +34,6 @@ const systemState = {
     failureCount: 0
   },
 
-  devices: {
-    connected: 0,
-    miners: []
-  },
-
   backend: 'starting',
   stratum: 'offline',
   timestamp: Date.now()
@@ -75,17 +70,6 @@ function updateRPCState(update) {
 function updateSystemState(update) {
   systemState.system = {
     ...systemState.system,
-    ...update
-  };
-}
-
-/**
- * Update devices state (called by device registry only)
- * @param {Object} update - Partial state update
- */
-function updateDevicesState(update) {
-  systemState.devices = {
-    ...systemState.devices,
     ...update
   };
 }
@@ -162,7 +146,6 @@ module.exports = {
   updateBitcoinState,
   updateRPCState,
   updateSystemState,
-  updateDevicesState,
   updateRpc,
   getState,
   getSnapshot,

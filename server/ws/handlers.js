@@ -9,6 +9,79 @@ const { sessionManager } = require('../services/sessionManager');
 const DeviceRegistry = require('../services/deviceRegistry');
 const deviceGateway = require('../gateway/deviceGateway');
 
+/**
+ * Join Device State - Combines identity (deviceRegistry) + runtime (state/index.js)
+ * Preserves frontend contract by returning unified device objects
+ * @param {string} deviceId - Device identifier
+ * @returns {Object|null} Unified device object or null if not found
+ */
+function joinDeviceState(deviceId) {
+  // Get identity from deviceRegistry
+  const registration = DeviceRegistry.getRegistration(deviceId);
+  // Get runtime from state/index.js
+  const runtime = state.getDevice(deviceId);
+
+  // If neither exists, return null
+  if (!registration && !runtime) {
+    return null;
+  }
+
+  // Merge identity + runtime into unified object
+  // Identity fields (from deviceRegistry)
+  const identity = registration ? {
+    deviceId: registration.deviceId,
+    workerName: registration.metadata.workerName || null,
+    walletAddress: registration.metadata.walletAddress || null,
+    deviceType: registration.metadata.deviceType || null,
+    firmwareVersion: registration.metadata.firmwareVersion || null
+  } : {
+    deviceId: deviceId,
+    workerName: null,
+    walletAddress: null,
+    deviceType: null,
+    firmwareVersion: null
+  };
+
+  // Runtime fields (from state/index.js)
+  const runtimeData = runtime ? {
+    status: runtime.status,
+    hashrate: runtime.hashrate,
+    uptime: runtime.uptime,
+    acceptedShares: runtime.acceptedShares,
+    rejectedShares: runtime.rejectedShares,
+    lastSeen: runtime.lastSeen,
+    currentJobId: runtime.currentJobId,
+    websocketState: runtime.websocketState,
+    reconnectCount: runtime.reconnectCount,
+    miningMode: runtime.miningMode,
+    connected: runtime.connected,
+    connectedAt: runtime.connectedAt,
+    ipAddress: runtime.ipAddress,
+    lastDisconnectReason: runtime.lastDisconnectReason
+  } : {
+    status: 'offline',
+    hashrate: 0,
+    uptime: 0,
+    acceptedShares: 0,
+    rejectedShares: 0,
+    lastSeen: null,
+    currentJobId: null,
+    websocketState: 'disconnected',
+    reconnectCount: 0,
+    miningMode: null,
+    connected: false,
+    connectedAt: null,
+    ipAddress: null,
+    lastDisconnectReason: null
+  };
+
+  // Return unified object (frontend-compatible)
+  return {
+    ...identity,
+    ...runtimeData
+  };
+}
+
 // Track active sockets per device to prevent duplicates
 const activeSockets = new Map(); // deviceId -> ws
 
@@ -84,10 +157,11 @@ const handlers = {
     // MODEL A: ESP32 devices auto-register on first connection
     if (!isRegistered && isEsp32Device) {
       console.log("[WS] DEVICE_AUTO_REGISTERED deviceId=" + deviceId + " reason=ESP32_SELF_REGISTRATION");
-      DeviceRegistry.register(deviceId, { 
+      DeviceRegistry.register(deviceId, {
         deviceType: data.deviceType || 'miner',
         workerName: data.workerName,
-        walletAddress: data.walletAddress
+        walletAddress: data.walletAddress,
+        firmwareVersion: data.firmwareVersion
       });
     }
 
@@ -136,30 +210,9 @@ const handlers = {
       // Mark device as connected with lifecycle tracking
       state.mutations.markDeviceConnected(deviceId, ipAddress);
 
-      // Handle workerName with fallback logic
-      if (data.workerName && typeof data.workerName === 'string' && data.workerName.trim().length > 0) {
-        // Only update workerName if device is new or explicitly changed
-        if (isNewDevice || !device.workerName) {
-          state.mutations.updateDevice(deviceId, {
-            workerName: data.workerName.trim()
-          });
-          console.log("[WS] WORKER_NAME_SET deviceId=" + deviceId + " workerName=" + data.workerName.trim());
-        }
-      } else if (isNewDevice && !device.workerName) {
-        // Fallback for new devices without workerName
-        const fallbackName = `miner-${deviceId.substring(0, 8)}`;
-        state.mutations.updateDevice(deviceId, {
-          workerName: fallbackName
-        });
-        console.log("[WS] WORKER_NAME_FALLBACK deviceId=" + deviceId + " workerName=" + fallbackName);
-      }
-
-      // Preserve firmware version if provided
-      if (data.firmwareVersion) {
-        state.mutations.updateDevice(deviceId, {
-          firmwareVersion: data.firmwareVersion
-        });
-      }
+      // Identity fields are now stored in deviceRegistry only
+      // workerName, walletAddress, deviceType, firmwareVersion are NOT written to state/index.js
+      // They are read from deviceRegistry via joinDeviceState()
 
       // Assign mining job
       const miningJobMsg = {

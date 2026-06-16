@@ -13,6 +13,8 @@ const state = {
 };
 
 // Standardized device model - ALL devices MUST follow this structure
+// Identity fields (workerName, walletAddress, deviceType, firmwareVersion) are NOW in deviceRegistry
+// This model contains ONLY runtime state
 const createDevice = (deviceId) => ({
   deviceId,
   status: "offline", // online | offline | mining | stale
@@ -27,15 +29,10 @@ const createDevice = (deviceId) => ({
   connected: false,
   connectedAt: null,
   reconnectCount: 0,
-  firmwareVersion: null,
   ipAddress: null,
   websocketState: "disconnected", // connected | disconnected | error
   lastDisconnectReason: null,
-  // Worker identity fields
-  workerName: null, // Primary display identity
-  // Onboarding fields
-  walletAddress: null,
-  deviceType: null,
+  // Runtime-only fields
   miningMode: null
 });
 

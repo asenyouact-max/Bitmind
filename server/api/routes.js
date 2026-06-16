@@ -5,6 +5,80 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const state = require('../state');
+const DeviceRegistry = require('../services/deviceRegistry');
+
+/**
+ * Join Device State - Combines identity (deviceRegistry) + runtime (state/index.js)
+ * Preserves frontend contract by returning unified device objects
+ * @param {string} deviceId - Device identifier
+ * @returns {Object|null} Unified device object or null if not found
+ */
+function joinDeviceState(deviceId) {
+  // Get identity from deviceRegistry
+  const registration = DeviceRegistry.getRegistration(deviceId);
+  // Get runtime from state/index.js
+  const runtime = state.getDevice(deviceId);
+
+  // If neither exists, return null
+  if (!registration && !runtime) {
+    return null;
+  }
+
+  // Merge identity + runtime into unified object
+  // Identity fields (from deviceRegistry)
+  const identity = registration ? {
+    deviceId: registration.deviceId,
+    workerName: registration.metadata.workerName || null,
+    walletAddress: registration.metadata.walletAddress || null,
+    deviceType: registration.metadata.deviceType || null,
+    firmwareVersion: registration.metadata.firmwareVersion || null
+  } : {
+    deviceId: deviceId,
+    workerName: null,
+    walletAddress: null,
+    deviceType: null,
+    firmwareVersion: null
+  };
+
+  // Runtime fields (from state/index.js)
+  const runtimeData = runtime ? {
+    status: runtime.status,
+    hashrate: runtime.hashrate,
+    uptime: runtime.uptime,
+    acceptedShares: runtime.acceptedShares,
+    rejectedShares: runtime.rejectedShares,
+    lastSeen: runtime.lastSeen,
+    currentJobId: runtime.currentJobId,
+    websocketState: runtime.websocketState,
+    reconnectCount: runtime.reconnectCount,
+    miningMode: runtime.miningMode,
+    connected: runtime.connected,
+    connectedAt: runtime.connectedAt,
+    ipAddress: runtime.ipAddress,
+    lastDisconnectReason: runtime.lastDisconnectReason
+  } : {
+    status: 'offline',
+    hashrate: 0,
+    uptime: 0,
+    acceptedShares: 0,
+    rejectedShares: 0,
+    lastSeen: null,
+    currentJobId: null,
+    websocketState: 'disconnected',
+    reconnectCount: 0,
+    miningMode: null,
+    connected: false,
+    connectedAt: null,
+    ipAddress: null,
+    lastDisconnectReason: null
+  };
+
+  // Return unified object (frontend-compatible)
+  return {
+    ...identity,
+    ...runtimeData
+  };
+}
 
 // Production safety - defensive checks
 const validation = {
@@ -25,7 +99,9 @@ function formatUptime(seconds) {
 // Miners endpoint - returns live miner registry (unified API)
 router.get('/miners', (req, res) => {
   try {
-    const minerList = state.getAllDevices();
+    const runtimeDevices = state.getAllDevices();
+    // Join identity + runtime for each device
+    const minerList = runtimeDevices.map(device => joinDeviceState(device.deviceId)).filter(Boolean);
 
     res.json({
       success: true,
@@ -149,7 +225,7 @@ router.get('/shares', (req, res) => {
 router.get('/telemetry/:deviceId', (req, res) => {
   try {
     const { deviceId } = req.params;
-    
+
     if (!validation.isValidDeviceId(deviceId)) {
       return res.status(400).json({
         success: false,
@@ -157,7 +233,7 @@ router.get('/telemetry/:deviceId', (req, res) => {
       });
     }
 
-    const device = state.getDevice(deviceId);
+    const device = joinDeviceState(deviceId);
     if (!device) {
       return res.status(404).json({
         success: false,
@@ -179,7 +255,7 @@ router.get('/telemetry/:deviceId', (req, res) => {
       // Extensible fields for future display support
       display: {
         hashrateUnit: 'H/s',
-        efficiency: device.acceptedShares > 0 
+        efficiency: device.acceptedShares > 0
           ? ((device.acceptedShares / (device.acceptedShares + device.rejectedShares)) * 100).toFixed(2) + '%'
           : '0%',
         uptimeFormatted: formatUptime(device.uptime)
@@ -218,17 +294,20 @@ router.get('/monitoring', (req, res) => {
     // WebSocket connection count
     const wsClientCount = wsServer ? wsServer.clients.size : 0;
 
-    // Include device list with workerName
-    const devicesList = allDevices.map(d => ({
-      deviceId: d.deviceId,
-      workerName: d.workerName || `miner-${d.deviceId.substring(0, 8)}`,
-      hashrate: d.hashrate,
-      acceptedShares: d.acceptedShares,
-      rejectedShares: d.rejectedShares,
-      uptime: d.uptime,
-      lastSeen: d.lastSeen,
-      status: d.status
-    }));
+    // Include device list with workerName (using joinDeviceState)
+    const devicesList = allDevices.map(d => {
+      const joined = joinDeviceState(d.deviceId);
+      return joined ? {
+        deviceId: joined.deviceId,
+        workerName: joined.workerName || `miner-${joined.deviceId.substring(0, 8)}`,
+        hashrate: joined.hashrate,
+        acceptedShares: joined.acceptedShares,
+        rejectedShares: joined.rejectedShares,
+        uptime: joined.uptime,
+        lastSeen: joined.lastSeen,
+        status: joined.status
+      } : null;
+    }).filter(Boolean);
 
     const monitoring = {
       timestamp: Date.now(),
@@ -280,15 +359,18 @@ router.get('/lifecycle', (req, res) => {
   try {
     const allDevices = state.getAllDevices();
 
-    // Include device list with workerName
-    const devicesList = allDevices.map(d => ({
-      deviceId: d.deviceId,
-      workerName: d.workerName || `miner-${d.deviceId.substring(0, 8)}`,
-      status: d.status,
-      connected: d.connected,
-      reconnectCount: d.reconnectCount,
-      websocketState: d.websocketState
-    }));
+    // Include device list with workerName (using joinDeviceState)
+    const devicesList = allDevices.map(d => {
+      const joined = joinDeviceState(d.deviceId);
+      return joined ? {
+        deviceId: joined.deviceId,
+        workerName: joined.workerName || `miner-${joined.deviceId.substring(0, 8)}`,
+        status: joined.status,
+        connected: joined.connected,
+        reconnectCount: joined.reconnectCount,
+        websocketState: joined.websocketState
+      } : null;
+    }).filter(Boolean);
 
     // Calculate lifecycle metrics
     const lifecycleStats = {
@@ -333,18 +415,22 @@ router.get('/top-miners', (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
     const allDevices = state.getAllDevices();
 
-    // Sort by hashrate DESC and limit
+    // Sort by hashrate DESC and limit (using joinDeviceState)
     const topMiners = allDevices
       .sort((a, b) => (b.hashrate || 0) - (a.hashrate || 0))
       .slice(0, limit)
-      .map(d => ({
-        workerName: d.workerName || `miner-${d.deviceId.substring(0, 8)}`,
-        hashrate: d.hashrate || 0,
-        acceptedShares: d.acceptedShares || 0,
-        rejectedShares: d.rejectedShares || 0,
-        uptime: d.uptime || 0,
-        status: d.status
-      }));
+      .map(d => {
+        const joined = joinDeviceState(d.deviceId);
+        return joined ? {
+          workerName: joined.workerName || `miner-${joined.deviceId.substring(0, 8)}`,
+          hashrate: joined.hashrate || 0,
+          acceptedShares: joined.acceptedShares || 0,
+          rejectedShares: joined.rejectedShares || 0,
+          uptime: joined.uptime || 0,
+          status: joined.status
+        } : null;
+      })
+      .filter(Boolean);
 
     res.json({
       success: true,
@@ -425,7 +511,7 @@ router.post('/miners/connect', (req, res) => {
   try {
     console.log('[API] MINER CONNECT REQUEST RECEIVED', req.body);
     const { walletAddress, workerName, deviceType, miningMode } = req.body;
-    
+
     // Validation
     if (!walletAddress || !walletAddress.trim()) {
       return res.status(400).json({
@@ -433,21 +519,21 @@ router.post('/miners/connect', (req, res) => {
         error: 'Wallet address is required'
       });
     }
-    
+
     if (!workerName || !workerName.trim()) {
       return res.status(400).json({
         success: false,
         error: 'Worker name is required'
       });
     }
-    
+
     if (workerName.length < 3) {
       return res.status(400).json({
         success: false,
         error: 'Worker name must be at least 3 characters'
       });
     }
-    
+
     // Basic Bitcoin address validation
     const bitcoinAddressRegex = /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$/;
     if (!bitcoinAddressRegex.test(walletAddress)) {
@@ -456,17 +542,24 @@ router.post('/miners/connect', (req, res) => {
         error: 'Invalid Bitcoin wallet address'
       });
     }
-    
+
     // Generate device ID
     const deviceId = crypto.randomBytes(16).toString('hex');
-    
-    // Create miner session
-    const miner = {
-      deviceId,
-      walletAddress: walletAddress.trim(),
-      workerName: workerName.trim(),
+
+    // Register identity in deviceRegistry
+    const registration = DeviceRegistry.register(deviceId, {
       deviceType: deviceType || 'esp32',
-      miningMode: miningMode || 'standard',
+      walletAddress: walletAddress.trim(),
+      workerName: workerName.trim()
+    });
+
+    if (!registration.success) {
+      return res.status(400).json(registration);
+    }
+
+    // Create runtime state in state/index.js
+    const minerRuntime = {
+      deviceId,
       status: 'online',
       connected: true,
       hashrate: 0,
@@ -476,39 +569,42 @@ router.post('/miners/connect', (req, res) => {
       lastSeen: Date.now(),
       reconnectCount: 0,
       websocketState: 'connected',
-      currentJobId: null
+      currentJobId: null,
+      miningMode: miningMode || 'standard'
     };
-    
-    // Store miner in state
-    state.mutations.addDevice(miner);
-    
-    // Emit WebSocket event
+
+    state.mutations.addDevice(minerRuntime);
+
+    // Join identity + runtime for response
+    const joinedMiner = joinDeviceState(deviceId);
+
+    // Emit WebSocket event (using joined state)
     if (global.wsServer) {
       console.log('[API] Broadcasting miner_connected event to', global.wsServer.clients.size, 'WebSocket clients');
       global.wsServer.clients.forEach(client => {
         if (client.readyState === 1) { // OPEN
           client.send(JSON.stringify({
             type: 'miner_connected',
-            data: miner
+            data: joinedMiner
           }));
         }
       });
     } else {
       console.warn('[API] No WebSocket server available for broadcasting');
     }
-    
+
     console.log(`[API] Miner connected successfully: ${workerName} (${deviceId})`);
-    
+
     res.json({
       success: true,
       miner: {
-        deviceId: miner.deviceId,
-        walletAddress: miner.walletAddress,
-        workerName: miner.workerName,
-        deviceType: miner.deviceType,
-        miningMode: miner.miningMode,
-        status: miner.status,
-        connectedAt: new Date(miner.lastSeen).toISOString()
+        deviceId: joinedMiner.deviceId,
+        walletAddress: joinedMiner.walletAddress,
+        workerName: joinedMiner.workerName,
+        deviceType: joinedMiner.deviceType,
+        miningMode: joinedMiner.miningMode,
+        status: joinedMiner.status,
+        connectedAt: new Date(joinedMiner.lastSeen).toISOString()
       }
     });
   } catch (error) {
