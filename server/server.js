@@ -1,6 +1,6 @@
 // Load environment variables from explicit path
 const path = require('path');
-const dotenvPath = path.join(__dirname, '../../.env');
+const dotenvPath = path.join(__dirname, '../.env');
 require('dotenv').config({ path: dotenvPath });
 console.log('[BOOT] dotenv loaded from:', dotenvPath);
 
