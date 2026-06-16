@@ -26,13 +26,22 @@ const STATE_MAPPING = {
     'FALLBACK': 'FALLBACK',
     'UNKNOWN': 'FALLBACK' // Default to fallback if unknown
   },
-  
+
   // Mining mode mapping
   miningMode: {
     'LIVE_MINING': 'LIVE_MINING',
     'SIMULATED_WORK_ONLY': 'SIMULATED_WORK_ONLY',
     'IDLE': 'IDLE',
     'UNKNOWN': 'IDLE' // Default to idle if unknown
+  },
+
+  // RPC state mapping
+  rpcState: {
+    'CONNECTED': 'CONNECTED',
+    'AUTH_FAILED': 'AUTH_FAILED',
+    'UNREACHABLE': 'UNREACHABLE',
+    'DISABLED': 'DISABLED',
+    'UNKNOWN': 'UNREACHABLE' // Default to unreachable if unknown
   }
 };
 
