@@ -337,7 +337,7 @@ router.get('/monitoring', (req, res) => {
         connectedClients: wsClientCount
       },
       rpc: {
-        status: rpcHealth
+        status: systemState.getSnapshot().rpc.status || 'unknown'
       }
     };
 

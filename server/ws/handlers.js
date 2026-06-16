@@ -100,10 +100,11 @@ const validation = {
   },
 
   isValidShare: (share) => {
-    return share && 
-           share.deviceId && 
-           share.jobId && 
-           share.nonce !== undefined;
+    return share &&
+           share.deviceId &&
+           share.jobId &&
+           share.nonce !== undefined &&
+           share.hash && typeof share.hash === 'string' && /^[a-f0-9]{64}$/.test(share.hash);
   },
 
   isValidStats: (stats) => {
@@ -214,21 +215,49 @@ const handlers = {
       // workerName, walletAddress, deviceType, firmwareVersion are NOT written to state/index.js
       // They are read from deviceRegistry via joinDeviceState()
 
-      // Assign mining job
-      const miningJobMsg = {
-        type: "mining_job",
-        jobId: require('crypto').randomUUID(),
-        height: 948958,
-        difficulty: "0000ffff",
-        target: "00000ffffffffffffffffffffffffffffffffffffffff"
-      };
+      // Assign mining job using jobManager for full protocol compliance
+      const { jobManager } = require('../services/jobManager');
+      const deviceContext = jobManager.assignWorkToDevice(deviceId);
 
-      ws.send(JSON.stringify(miningJobMsg));
+      if (deviceContext) {
+        // Get current job from jobManager
+        const currentJob = jobManager.getCurrentJob();
+        if (currentJob) {
+          // Create protocol-compliant mining.job message with all required fields
+          const miningJobMsg = {
+            type: "mining.job",
+            jobId: currentJob.jobId,
+            sessionId: deviceContext.sessionId,
+            height: currentJob.height,
+            target: currentJob.target,
+            pseudoTarget: currentJob.pseudoTarget || null,
+            pseudoMining: currentJob.pseudoMining || false,
+            createdAt: currentJob.createdAt,
+            version: currentJob.version,
+            previousblockhash: currentJob.previousblockhash,
+            merkleroot: currentJob.merkleroot || '',
+            nbits: currentJob.nbits,
+            ntime: currentJob.ntime,
+            deviceContext: {
+              sessionId: deviceContext.sessionId,
+              nonceStart: deviceContext.nonceStart,
+              nonceEnd: deviceContext.nonceEnd,
+              extranonce1: deviceContext.extranonce1
+            }
+          };
 
-      // Update device with current job
-      state.mutations.updateDevice(deviceId, {
-        currentJobId: miningJobMsg.jobId
-      });
+          ws.send(JSON.stringify(miningJobMsg));
+
+          // Update device with current job
+          state.mutations.updateDevice(deviceId, {
+            currentJobId: currentJob.jobId
+          });
+        } else {
+          console.log("[WS] NO_CURRENT_JOB deviceId=" + deviceId);
+        }
+      } else {
+        console.log("[WS] NO_DEVICE_CONTEXT deviceId=" + deviceId);
+      }
 
       // Store deviceId on WebSocket for cleanup
       ws.deviceId = deviceId;
@@ -251,6 +280,14 @@ const handlers = {
     if (!validation.isValidDeviceId(data.deviceId)) {
       console.log("[WS] HEARTBEAT_FAILED deviceId=null reason=INVALID_DEVICE_ID");
       return false;
+    }
+
+    // Validate wifiRssi if present (optional for backward compatibility)
+    if (data.wifiRssi !== undefined) {
+      if (typeof data.wifiRssi !== 'number' || data.wifiRssi < -100 || data.wifiRssi > 0) {
+        console.log("[WS] HEARTBEAT_FAILED deviceId=" + data.deviceId + " reason=INVALID_WIFI_RSSI value=" + data.wifiRssi);
+        return false;
+      }
     }
 
     // Update device through state module with lifecycle tracking
