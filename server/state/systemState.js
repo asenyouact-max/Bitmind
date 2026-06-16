@@ -130,6 +130,33 @@ function getSnapshot() {
   return systemState;
 }
 
+/**
+ * Update Bitcoin status (compatibility wrapper for legacy code)
+ * @param {string} status - Bitcoin status
+ */
+function updateBitcoin(status) {
+  systemState.bitcoin.mode = status || 'UNKNOWN';
+  systemState.bitcoin.lastUpdated = Date.now();
+}
+
+/**
+ * Update backend status (compatibility wrapper for legacy code)
+ * @param {string} status - Backend status
+ */
+function updateBackend(status) {
+  systemState.backend = status || 'unknown';
+  systemState.timestamp = Date.now();
+}
+
+/**
+ * Update stratum status (compatibility wrapper for legacy code)
+ * @param {string} status - Stratum status
+ */
+function updateStratum(status) {
+  systemState.stratum = status || 'unknown';
+  systemState.timestamp = Date.now();
+}
+
 module.exports = {
   systemState,
   updateBitcoinState,
@@ -138,5 +165,8 @@ module.exports = {
   updateDevicesState,
   updateRpc,
   getState,
-  getSnapshot
+  getSnapshot,
+  updateBitcoin,
+  updateBackend,
+  updateStratum
 };
