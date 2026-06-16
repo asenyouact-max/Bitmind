@@ -14,7 +14,7 @@ cd /opt/Bitmind
 # Create .env file
 cat > .env << 'EOF'
 PORT=3001
-RPC_HOST=127.0.0.1
+RPC_HOST=100.82.184.116
 RPC_PORT=8332
 RPC_USER=Global
 RPC_PASSWORD=BITMIND400K@Hot$$$
