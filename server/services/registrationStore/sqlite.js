@@ -352,6 +352,15 @@ class SQLiteRegistrationStore {
       }
     });
   }
+
+  /**
+   * Check if device is a dev client (web-client-*)
+   * @param {string} deviceId - Device identifier
+   * @returns {boolean} True if dev client, false if not
+   */
+  isDevClient(deviceId) {
+    return deviceId && deviceId.startsWith('web-client-');
+  }
 }
 
 module.exports = SQLiteRegistrationStore;
