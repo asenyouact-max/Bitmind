@@ -1,21 +1,33 @@
 // API ROUTES MODULE
 // Only reads from state module - no mutations allowed
+// Phase F5-P1: Identity Architecture - Use RegistrationStore for persistent device identity
 
 const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const state = require('../state');
-const DeviceRegistry = require('../services/deviceRegistry');
+const RegistrationStore = require('../services/registrationStore');
+
+// RegistrationStore instance (initialized in server/index.js)
+let registrationStore = null;
 
 /**
- * Join Device State - Combines identity (deviceRegistry) + runtime (state/index.js)
+ * Set RegistrationStore instance
+ * @param {RegistrationStore} store - RegistrationStore instance
+ */
+function setRegistrationStore(store) {
+  registrationStore = store;
+}
+
+/**
+ * Join Device State - Combines identity (registrationStore) + runtime (state/index.js)
  * Preserves frontend contract by returning unified device objects
  * @param {string} deviceId - Device identifier
- * @returns {Object|null} Unified device object or null if not found
+ * @returns {Promise<Object|null>} Unified device object or null if not found
  */
-function joinDeviceState(deviceId) {
-  // Get identity from deviceRegistry
-  const registration = DeviceRegistry.getRegistration(deviceId);
+async function joinDeviceState(deviceId) {
+  // Get identity from registrationStore
+  const registration = registrationStore ? await registrationStore.getDevice(deviceId) : null;
   // Get runtime from state/index.js
   const runtime = state.getDevice(deviceId);
 
@@ -25,13 +37,13 @@ function joinDeviceState(deviceId) {
   }
 
   // Merge identity + runtime into unified object
-  // Identity fields (from deviceRegistry)
+  // Identity fields (from registrationStore)
   const identity = registration ? {
     deviceId: registration.deviceId,
-    workerName: registration.metadata.workerName || null,
-    walletAddress: registration.metadata.walletAddress || null,
-    deviceType: registration.metadata.deviceType || null,
-    firmwareVersion: registration.metadata.firmwareVersion || null
+    workerName: registration.workerName || null,
+    walletAddress: registration.walletAddress || null,
+    deviceType: registration.deviceType || null,
+    firmwareVersion: registration.firmwareVersion || null
   } : {
     deviceId: deviceId,
     workerName: null,
@@ -97,11 +109,11 @@ function formatUptime(seconds) {
 }
 
 // Miners endpoint - returns live miner registry (unified API)
-router.get('/miners', (req, res) => {
+router.get('/miners', async (req, res) => {
   try {
     const runtimeDevices = state.getAllDevices();
     // Join identity + runtime for each device
-    const minerList = runtimeDevices.map(device => joinDeviceState(device.deviceId)).filter(Boolean);
+    const minerList = await Promise.all(runtimeDevices.map(device => joinDeviceState(device.deviceId))).filter(Boolean);
 
     res.json({
       success: true,
@@ -222,7 +234,7 @@ router.get('/shares', (req, res) => {
 });
 
 // Device telemetry endpoint - per-device stats
-router.get('/telemetry/:deviceId', (req, res) => {
+router.get('/telemetry/:deviceId', async (req, res) => {
   try {
     const { deviceId } = req.params;
 
@@ -233,7 +245,7 @@ router.get('/telemetry/:deviceId', (req, res) => {
       });
     }
 
-    const device = joinDeviceState(deviceId);
+    const device = await joinDeviceState(deviceId);
     if (!device) {
       return res.status(404).json({
         success: false,
@@ -276,7 +288,7 @@ router.get('/telemetry/:deviceId', (req, res) => {
 });
 
 // System monitoring endpoint - comprehensive system stats
-router.get('/monitoring', (req, res) => {
+router.get('/monitoring', async (req, res) => {
   try {
     const allDevices = state.getAllDevices();
     const systemStats = state.getSystemStats();
@@ -295,8 +307,8 @@ router.get('/monitoring', (req, res) => {
     const wsClientCount = wsServer ? wsServer.clients.size : 0;
 
     // Include device list with workerName (using joinDeviceState)
-    const devicesList = allDevices.map(d => {
-      const joined = joinDeviceState(d.deviceId);
+    const devicesList = await Promise.all(allDevices.map(async d => {
+      const joined = await joinDeviceState(d.deviceId);
       return joined ? {
         deviceId: joined.deviceId,
         workerName: joined.workerName || `miner-${joined.deviceId.substring(0, 8)}`,
@@ -307,7 +319,7 @@ router.get('/monitoring', (req, res) => {
         lastSeen: joined.lastSeen,
         status: joined.status
       } : null;
-    }).filter(Boolean);
+    })).filter(Boolean);
 
     const monitoring = {
       timestamp: Date.now(),
@@ -355,13 +367,13 @@ router.get('/monitoring', (req, res) => {
 });
 
 // Miner lifecycle endpoint - lifecycle statistics
-router.get('/lifecycle', (req, res) => {
+router.get('/lifecycle', async (req, res) => {
   try {
     const allDevices = state.getAllDevices();
 
     // Include device list with workerName (using joinDeviceState)
-    const devicesList = allDevices.map(d => {
-      const joined = joinDeviceState(d.deviceId);
+    const devicesList = await Promise.all(allDevices.map(async d => {
+      const joined = await joinDeviceState(d.deviceId);
       return joined ? {
         deviceId: joined.deviceId,
         workerName: joined.workerName || `miner-${joined.deviceId.substring(0, 8)}`,
@@ -370,7 +382,7 @@ router.get('/lifecycle', (req, res) => {
         reconnectCount: joined.reconnectCount,
         websocketState: joined.websocketState
       } : null;
-    }).filter(Boolean);
+    })).filter(Boolean);
 
     // Calculate lifecycle metrics
     const lifecycleStats = {
@@ -410,27 +422,28 @@ router.get('/lifecycle', (req, res) => {
 });
 
 // Top Miners endpoint - leaderboard sorted by hashrate
-router.get('/top-miners', (req, res) => {
+router.get('/top-miners', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 5;
     const allDevices = state.getAllDevices();
 
     // Sort by hashrate DESC and limit (using joinDeviceState)
-    const topMiners = allDevices
-      .sort((a, b) => (b.hashrate || 0) - (a.hashrate || 0))
-      .slice(0, limit)
-      .map(d => {
-        const joined = joinDeviceState(d.deviceId);
-        return joined ? {
-          workerName: joined.workerName || `miner-${joined.deviceId.substring(0, 8)}`,
-          hashrate: joined.hashrate || 0,
-          acceptedShares: joined.acceptedShares || 0,
-          rejectedShares: joined.rejectedShares || 0,
-          uptime: joined.uptime || 0,
-          status: joined.status
-        } : null;
-      })
-      .filter(Boolean);
+    const topMiners = await Promise.all(
+      allDevices
+        .sort((a, b) => (b.hashrate || 0) - (a.hashrate || 0))
+        .slice(0, limit)
+        .map(async d => {
+          const joined = await joinDeviceState(d.deviceId);
+          return joined ? {
+            workerName: joined.workerName || `miner-${joined.deviceId.substring(0, 8)}`,
+            hashrate: joined.hashrate || 0,
+            acceptedShares: joined.acceptedShares || 0,
+            rejectedShares: joined.rejectedShares || 0,
+            uptime: joined.uptime || 0,
+            status: joined.status
+          } : null;
+        })
+    ).filter(Boolean);
 
     res.json({
       success: true,
@@ -464,10 +477,9 @@ router.get('/system/status', async (req, res) => {
 });
 
 // Device Register endpoint - unified device registration
-router.post('/device/register', (req, res) => {
+router.post('/device/register', async (req, res) => {
   try {
     const { deviceId, deviceType, walletAddress, workerName } = req.body;
-    const DeviceRegistry = require('../services/deviceRegistry');
 
     // Validation
     if (!deviceId || !deviceId.trim()) {
@@ -477,25 +489,20 @@ router.post('/device/register', (req, res) => {
       });
     }
 
-    // Register device using DeviceRegistry
-    const result = DeviceRegistry.register(deviceId, {
+    // Register device using RegistrationStore
+    const registration = await registrationStore.registerDevice(deviceId, {
       deviceType: deviceType || 'web-client',
       walletAddress: walletAddress || null,
       workerName: workerName || null
     });
 
-    if (!result.success) {
-      return res.status(400).json(result);
-    }
-
-    console.log(`[API] Device registered: ${deviceId} (${result.isNew ? 'NEW' : 'UPDATE'})`);
+    console.log(`[API] Device registered: ${deviceId}`);
 
     res.json({
       success: true,
-      deviceId: result.deviceId,
-      status: result.status,
-      isNew: result.isNew,
-      token: result.token
+      deviceId: registration.deviceId,
+      status: 'registered',
+      token: registration.token
     });
   } catch (error) {
     console.error('Error registering device:', error);
@@ -507,7 +514,7 @@ router.post('/device/register', (req, res) => {
 });
 
 // Connect Miner endpoint - onboarding flow
-router.post('/miners/connect', (req, res) => {
+router.post('/miners/connect', async (req, res) => {
   try {
     console.log('[API] MINER CONNECT REQUEST RECEIVED', req.body);
     const { walletAddress, workerName, deviceType, miningMode } = req.body;
@@ -546,16 +553,12 @@ router.post('/miners/connect', (req, res) => {
     // Generate device ID
     const deviceId = crypto.randomBytes(16).toString('hex');
 
-    // Register identity in deviceRegistry
-    const registration = DeviceRegistry.register(deviceId, {
+    // Register identity in RegistrationStore
+    const registration = await registrationStore.registerDevice(deviceId, {
       deviceType: deviceType || 'esp32',
       walletAddress: walletAddress.trim(),
       workerName: workerName.trim()
     });
-
-    if (!registration.success) {
-      return res.status(400).json(registration);
-    }
 
     // Create runtime state in state/index.js
     const minerRuntime = {
@@ -576,7 +579,7 @@ router.post('/miners/connect', (req, res) => {
     state.mutations.addDevice(minerRuntime);
 
     // Join identity + runtime for response
-    const joinedMiner = joinDeviceState(deviceId);
+    const joinedMiner = await joinDeviceState(deviceId);
 
     // Emit WebSocket event (using joined state)
     if (global.wsServer) {
@@ -616,4 +619,7 @@ router.post('/miners/connect', (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = {
+  router,
+  setRegistrationStore
+};

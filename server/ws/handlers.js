@@ -1,23 +1,35 @@
 // WEBSOCKET HANDLERS MODULE
 // Phase D: All device communication MUST go through deviceGateway
+// Phase F5-P1: Identity Architecture - Use RegistrationStore for persistent device identity
 // Only handles WebSocket events - delegates all state mutations to state module
 
 const crypto = require('crypto');
 const state = require('../state');
 const { BitcoinValidation } = require('../services/bitcoinValidation');
 const { sessionManager } = require('../services/sessionManager');
-const DeviceRegistry = require('../services/deviceRegistry');
+const RegistrationStore = require('../services/registrationStore');
 const deviceGateway = require('../gateway/deviceGateway');
 
+// RegistrationStore instance (initialized in server/index.js)
+let registrationStore = null;
+
 /**
- * Join Device State - Combines identity (deviceRegistry) + runtime (state/index.js)
+ * Set RegistrationStore instance
+ * @param {RegistrationStore} store - RegistrationStore instance
+ */
+function setRegistrationStore(store) {
+  registrationStore = store;
+}
+
+/**
+ * Join Device State - Combines identity (registrationStore) + runtime (state/index.js)
  * Preserves frontend contract by returning unified device objects
  * @param {string} deviceId - Device identifier
- * @returns {Object|null} Unified device object or null if not found
+ * @returns {Promise<Object|null>} Unified device object or null if not found
  */
-function joinDeviceState(deviceId) {
-  // Get identity from deviceRegistry
-  const registration = DeviceRegistry.getRegistration(deviceId);
+async function joinDeviceState(deviceId) {
+  // Get identity from registrationStore
+  const registration = registrationStore ? await registrationStore.getDevice(deviceId) : null;
   // Get runtime from state/index.js
   const runtime = state.getDevice(deviceId);
 
@@ -27,13 +39,13 @@ function joinDeviceState(deviceId) {
   }
 
   // Merge identity + runtime into unified object
-  // Identity fields (from deviceRegistry)
+  // Identity fields (from registrationStore)
   const identity = registration ? {
     deviceId: registration.deviceId,
-    workerName: registration.metadata.workerName || null,
-    walletAddress: registration.metadata.walletAddress || null,
-    deviceType: registration.metadata.deviceType || null,
-    firmwareVersion: registration.metadata.firmwareVersion || null
+    workerName: registration.workerName || null,
+    walletAddress: registration.walletAddress || null,
+    deviceType: registration.deviceType || null,
+    firmwareVersion: registration.firmwareVersion || null
   } : {
     deviceId: deviceId,
     workerName: null,
@@ -128,9 +140,10 @@ const validation = {
 
 // WebSocket event handlers - ONLY READ/WRITE THROUGH STATE MODULE
 const handlers = {
-  // Device registration handler with DeviceRegistry integration
+  // Device registration handler with RegistrationStore integration
   // Phase D: Uses deviceGateway for protocol-compliant validation and messages
-  register: (ws, data) => {
+  // Phase F5-P1: Uses RegistrationStore for persistent device identity
+  register: async (ws, data) => {
     const deviceId = data.deviceId;
     const ipAddress = ws._socket.remoteAddress;
 
@@ -143,22 +156,22 @@ const handlers = {
       return false;
     }
 
-    // Check if device is registered in DeviceRegistry
-    const isRegistered = DeviceRegistry.isRegistered(deviceId);
-    const isDevClient = DeviceRegistry.isDevClient(deviceId);
+    // Check if device is registered in RegistrationStore
+    const isRegistered = registrationStore ? await registrationStore.isRegistered(deviceId) : false;
+    const isDevClient = registrationStore ? registrationStore.isDevClient(deviceId) : false;
     const isEsp32Device = deviceId && deviceId.startsWith('esp32-');
 
     // Dev mode: allow web-client-* devices with warning
     if (!isRegistered && isDevClient) {
       console.log("[WS] DEVICE_DEV_MODE_ALLOWED deviceId=" + deviceId + " reason=DEV_CLIENT_AUTO_ACCEPT");
       // Auto-register dev clients
-      DeviceRegistry.register(deviceId, { deviceType: 'web-client' });
+      await registrationStore.registerDevice(deviceId, { deviceType: 'web-client' });
     }
 
     // MODEL A: ESP32 devices auto-register on first connection
     if (!isRegistered && isEsp32Device) {
       console.log("[WS] DEVICE_AUTO_REGISTERED deviceId=" + deviceId + " reason=ESP32_SELF_REGISTRATION");
-      DeviceRegistry.register(deviceId, {
+      await registrationStore.registerDevice(deviceId, {
         deviceType: data.deviceType || 'miner',
         workerName: data.workerName,
         walletAddress: data.walletAddress,
@@ -167,7 +180,7 @@ const handlers = {
     }
 
     // If still not registered (non-ESP32, non-dev-client), reject
-    if (!DeviceRegistry.isRegistered(deviceId)) {
+    if (!(await registrationStore.isRegistered(deviceId))) {
       console.log("[WS] DEVICE_REJECTED_UNREGISTERED deviceId=" + deviceId);
       const errorMsg = deviceGateway.createDeviceError('AUTH_INVALID', 'Device must be registered via REST API before WebSocket connection');
       ws.send(JSON.stringify(errorMsg));
@@ -192,8 +205,9 @@ const handlers = {
     }
 
     try {
-      // Phase D: Send protocol-compliant registration response
-      const token = crypto.randomBytes(16).toString('hex');
+      // Phase F5-P1: Get token from RegistrationStore (preserve existing token)
+      const registration = await registrationStore.getDevice(deviceId);
+      const token = registration ? registration.token : crypto.randomBytes(16).toString('hex');
       const regResponse = deviceGateway.createRegistrationResponse(deviceId, token);
       ws.send(JSON.stringify(regResponse));
 
@@ -482,5 +496,6 @@ const handlers = {
 
 module.exports = {
   handlers,
-  validation
+  validation,
+  setRegistrationStore
 };

@@ -37,6 +37,8 @@ const apiRoutes = require('./api/routes');
 const miningServices = require('./services/mining');
 const coreUtils = require('./core/utils');
 const { startWatchdog } = require('./core/watchdog');
+const RegistrationStore = require('./services/registrationStore');
+const SQLiteRegistrationStore = require('./services/registrationStore/sqlite');
 
 // Startup safety logs
 console.log('[BOOT] Bitmind server initializing...');
@@ -586,7 +588,7 @@ const DEVICE_STATES = {
 // Legacy device discovery endpoint removed - now handled by /api/miners
 
 // PRODUCTION-GRADE API ROUTES - READ FROM UNIFIED STATE ONLY
-app.use('/api', apiRoutes);
+app.use('/api', apiRoutes.router);
 
 // Legacy device info endpoint removed - now handled by /api/telemetry/:deviceId
 
@@ -912,6 +914,9 @@ function stopWorkUpdates() {
 let isStarting = false;
 let isStarted = false;
 
+// RegistrationStore instance
+let registrationStore = null;
+
 // Startup sequence with proper order and validation
 async function startServer() {
   // Prevent double initialization
@@ -942,6 +947,18 @@ async function startServer() {
     console.log(`[SYSTEM] Bitcoin RPC: ${RPC_HOST}:${RPC_PORT}`);
     console.log(`[SYSTEM] Node version: ${process.version}`);
     console.log(`[SYSTEM] Platform: ${process.platform}`);
+
+    // Phase F5-P1: Initialize RegistrationStore (persistent device identity)
+    console.log(`[SYSTEM] Initializing RegistrationStore (SQLite)...`);
+    const dbPath = path.join(__dirname, 'data', 'registrations.db');
+    registrationStore = new SQLiteRegistrationStore(dbPath);
+    await registrationStore.initialize();
+    console.log(`[SYSTEM] ✅ RegistrationStore initialized: ${dbPath}`);
+
+    // Set RegistrationStore instance in handlers and routes
+    wsHandlers.setRegistrationStore(registrationStore);
+    apiRoutes.setRegistrationStore(registrationStore);
+    console.log(`[SYSTEM] ✅ RegistrationStore injected into handlers and routes`);
 
     // Phase C.4: Read system state (no guessing logic)
     const state = systemState.getSnapshot();
