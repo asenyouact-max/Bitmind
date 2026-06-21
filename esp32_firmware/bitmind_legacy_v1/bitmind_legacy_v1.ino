@@ -309,6 +309,8 @@ void sendDeviceRegister() {
   message += "\"deviceId\":\"" + deviceId + "\",";
   message += "\"deviceType\":\"" + String(DEVICE_TYPE) + "\",";
   message += "\"firmwareVersion\":\"" + String(FIRMWARE_VERSION) + "\",";
+  message += "\"workerName\":\"" + config.workerName + "\",";
+  message += "\"walletAddress\":\"" + config.wallet + "\",";
   message += "\"capabilities\":{\"oled\":false,\"wifi\":true,\"stratum\":true}";
   message += "}";
   

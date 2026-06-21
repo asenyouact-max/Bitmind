@@ -17,6 +17,8 @@
           "deviceId": { "type": "string", "pattern": "^esp32-[a-f0-9]{4,12}$" },
           "deviceType": { "enum": ["oled_miner", "miner", "test_client"] },
           "firmwareVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+          "workerName": { "type": "string", "minLength": 3, "maxLength": 50 },
+          "walletAddress": { "type": "string", "pattern": "^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,39}$" },
           "capabilities": {
             "type": "object",
             "properties": {
