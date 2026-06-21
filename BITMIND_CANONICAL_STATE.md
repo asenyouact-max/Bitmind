@@ -1,5 +1,5 @@
 # BITMIND CANONICAL STATE v1
-Last Updated: 2026-06-08
+Last Updated: 2026-06-21
 Status: ACTIVE
 Authority: This document is the single source of truth for Bitmind.
 
@@ -89,7 +89,10 @@ SYSTEM ARCHITECTURE
              BACKEND API                                   STRATUM
                   |                                              |
                   |                                              |
-             WEBSOCKET                                    MINING JOBS
+        REGISTRATION STORE (SQLite)                   MINING JOBS
+                  |                                              |
+                  |                                              |
+             WEBSOCKET                                    STATE (Memory)
                   |                                              |
                   ------------------------------------------------
                                         |
@@ -258,10 +261,10 @@ Requirements:
 
 Requirements:
 
-[ ] Device registration
-[ ] Device identification
-[ ] Device status reporting
-[ ] Device management
+[X] Device registration (persistent via RegistrationStore)
+[X] Device identification (deviceId + token)
+[X] Device status reporting (WebSocket + API)
+[X] Device management (API endpoints)
 
 ------------------------------------------------------------------------------
 
@@ -322,13 +325,16 @@ KNOWN COMPLETED FEATURES
 
 Update ONLY when verified.
 
-[ ] Stratum integration complete
+[X] Stratum integration complete
 [ ] Real mining tested
 [ ] Reward path verified
 [ ] QR onboarding functional
-[ ] Device registration working
-[ ] Worker name storage working
-[ ] Firmware architecture defined
+[X] Device registration working (persistent via RegistrationStore)
+[X] Worker name storage working (RegistrationStore + NV storage)
+[X] Firmware architecture defined
+[X] Identity architecture implemented (RegistrationStore + SQLite)
+[X] Token lifecycle fixed (generated once, preserved)
+[X] Onboarding alignment implemented (workerName + walletAddress in payload)
 
 ==============================================================================
 WORKER IDENTITY MODEL
@@ -336,15 +342,172 @@ WORKER IDENTITY MODEL
 
 STATUS: FINAL
 
-Worker Name:
+Worker Identity Model:
 
-Primary device identity
+Primary device identity consists of:
+- workerName (user-provided, stored in NV storage and RegistrationStore)
+- walletAddress (user-provided, stored in NV storage and RegistrationStore)
+- deviceId (MAC-based for ESP32, random hex for virtual)
+- token (backend-generated, 32-byte hex, persisted)
 
 Requirements:
 
-- Single identity source
+- Single identity source (RegistrationStore)
 - No duplicate naming systems
 - No secondary worker mappings
+- Token-based authentication
+- Persistent identity (survives backend/PM2/VPS restarts)
+
+==============================================================================
+IDENTITY ARCHITECTURE
+==============================================================================
+
+STATUS: FINAL
+
+Authority Document:
+
+BITMIND_F5_IDENTITY_ARCHITECTURE_DESIGN.md
+
+Identity Model:
+
+deviceId + token + registration persistence
+
+Components:
+
+- RegistrationStore: Storage-agnostic abstraction layer
+- SQLite: Phase A storage backend (server/data/registrations.db)
+- Token: 32-byte hex, generated once, preserved across reconnections
+- workerName: User-provided, stored in NV storage and RegistrationStore
+- walletAddress: User-provided, stored in NV storage and RegistrationStore
+
+Persistence:
+
+- Registrations persist across backend/PM2/VPS restarts
+- Token persists across all restart scenarios
+- Identity preserved across firmware reboots
+
+Scalability:
+
+- Phase A: SQLite (10,000+ devices)
+- Phase B+: PostgreSQL (100,000+ devices)
+- Phase C: Redis + PostgreSQL (1,000,000+ devices)
+
+No identity architecture changes without updating BITMIND_F5_IDENTITY_ARCHITECTURE_DESIGN.md first.
+
+==============================================================================
+REGISTRATION STORE
+==============================================================================
+
+STATUS: FINAL
+
+Purpose:
+
+Persistent device registration storage
+
+Implementation:
+
+- Interface: server/services/registrationStore.js
+- Backend: server/services/registrationStore/sqlite.js
+- Database: server/data/registrations.db
+
+Schema:
+
+registrations table:
+- deviceId (PK)
+- token
+- workerName
+- walletAddress
+- deviceType
+- firmwareVersion
+- registeredAt
+- lastSeen
+
+Methods:
+
+- registerDevice()
+- getDevice()
+- updateDevice()
+- removeDevice()
+- validateToken()
+- isRegistered()
+- getAllRegistrations()
+- getRegistrationCount()
+- clear()
+- initialize()
+- close()
+
+No RegistrationStore changes without updating BITMIND_F5_IDENTITY_ARCHITECTURE_DESIGN.md first.
+
+==============================================================================
+TOKEN LIFECYCLE
+==============================================================================
+
+STATUS: FINAL
+
+Token Format:
+
+32-byte hex (64 hex characters)
+
+Generation:
+
+- Generated once on first registration
+- Generated by backend (RegistrationStore)
+- Cryptographically random
+
+Persistence:
+
+- Backend: SQLite database (registrations table)
+- Firmware: NV storage (Preferences)
+
+Lifecycle:
+
+1. First Registration: Token generated, stored in database and NV storage
+2. Reconnection: Same token reused, retrieved from database
+3. Backend Restart: Token preserved in database
+4. PM2 Restart: Token preserved in database
+5. VPS Reboot: Token preserved in database
+6. Factory Reset: Token cleared, new token generated on next registration
+
+Validation:
+
+- Token validated on every WebSocket connection
+- Token validation logging-only (Phase A)
+- Token mismatch: Connection rejected (Phase B+)
+
+No token lifecycle changes without updating BITMIND_F5_IDENTITY_ARCHITECTURE_DESIGN.md first.
+
+==============================================================================
+ONBOARDING ALIGNMENT
+==============================================================================
+
+STATUS: FINAL
+
+Purpose:
+
+Align firmware registration with onboarding flow
+
+Implementation:
+
+- Firmware device.register includes workerName and walletAddress
+- Protocol schema updated (device-protocol-v1.json)
+- workerName and walletAddress are optional (backward compatible)
+- Virtual devices already aligned (Connect Miner)
+
+Flow:
+
+1. AP Provisioning: User configures workerName and walletAddress
+2. NV Storage: workerName and walletAddress saved to Preferences
+3. Device Registration: device.register includes workerName and walletAddress
+4. RegistrationStore: workerName and walletAddress stored in database
+5. Mining: workerName and walletAddress used for pool identification
+
+Backward Compatibility:
+
+- Old firmware (without fields) continues to work
+- New firmware (with fields) fully aligned
+- No protocol breaking changes
+
+No onboarding alignment changes without updating BITMIND_F5_P2_ONBOARDING_CONTRACT.md first.
 
 ==============================================================================
 PHASE A EXCLUSIONS
@@ -409,17 +572,38 @@ Status:
 DECISION LOG
 ==============================================================================
 
-Date:
-Decision:
-Reason:
-Approved By:
+Date: 2026-06-21
+Decision: Implement persistent device identity architecture (F5-P0)
+Reason: Critical architectural defect - in-memory DeviceRegistry lost on restart
+Approved By: F5-P0 Design Document
 
 ------------------------------------------------------------------------------
 
-Date:
-Decision:
-Reason:
-Approved By:
+Date: 2026-06-21
+Decision: Replace DeviceRegistry with RegistrationStore (F5-P1)
+Reason: Enable persistent device identity across backend/PM2/VPS restarts
+Approved By: F5-P1 Implementation
+
+------------------------------------------------------------------------------
+
+Date: 2026-06-21
+Decision: Use SQLite as Phase A storage backend (F5-P1)
+Reason: Simple, file-based, no external dependencies, sufficient for 10,000 devices
+Approved By: F5-P1 Implementation
+
+------------------------------------------------------------------------------
+
+Date: 2026-06-21
+Decision: Fix token lifecycle to be stable (F5-P1)
+Reason: Token was regenerated on every connection, causing identity instability
+Approved By: F5-P1 Implementation
+
+------------------------------------------------------------------------------
+
+Date: 2026-06-21
+Decision: Align firmware registration with onboarding flow (F5-P2)
+Reason: Firmware device.register missing workerName and walletAddress
+Approved By: F5-P2 Implementation
 
 ==============================================================================
 DO NOT CHANGE WITHOUT EXPLICIT APPROVAL
@@ -431,6 +615,10 @@ DO NOT CHANGE WITHOUT EXPLICIT APPROVAL
 - Worker identity model
 - RPC authority model
 - Phase A scope
+- Identity architecture (F5-P0)
+- RegistrationStore abstraction (F5-P1)
+- Token lifecycle (F5-P1)
+- Onboarding alignment (F5-P2)
 
 ==============================================================================
 END OF DOCUMENT
