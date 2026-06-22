@@ -13,6 +13,7 @@
 **Objective:** Design complete TFT UI architecture for ESP32-2432S028 production hardware.
 
 **Key Design Principles:**
+- Bitcoin/mining product identity
 - Professional production appearance
 - Color hierarchy for visual clarity
 - Larger typography for readability
@@ -76,13 +77,16 @@
 **Primary Colors:**
 - Background: Black (0x0000)
 - Foreground: White (0xFFFF)
-- Accent Green: Green (0x07E0)
+
+**Brand Accent (Bitcoin Orange):**
+- Branding: Bitcoin Orange (0xFD20)
+- Headers: Bitcoin Orange (0xFD20)
+- Active Mining Indicators: Bitcoin Orange (0xFD20)
 
 **Status Colors:**
-- Success: Green (0x07E0)
-- Active: Green (0x07E0)
-- Warning: Orange (0xFD20)
+- Success/Connected: Green (0x07E0)
 - Error: Red (0xF800)
+- Warning/Activity: Orange (0xFD20)
 - Info: Blue (0x001F)
 
 **Secondary Colors:**
@@ -100,24 +104,25 @@
 **Foreground:**
 - Primary Text: White (0xFFFF)
 - Secondary Text: Light Gray (0xC618)
-- Accent Text: Green (0x07E0)
+- Brand Accent Text: Bitcoin Orange (0xFD20)
 
 **Status Indicators:**
-- Mining Active: Green (0x07E0)
+- Mining Active: Bitcoin Orange (0xFD20)
+- Connected: Green (0x07E0)
 - Connecting: Blue (0x001F)
 - Error: Red (0xF800)
-- Warning: Orange (0xFD20)
+- Warning/Activity: Orange (0xFD20)
 
 ### 3.3 Visual Hierarchy
 
 **Level 1 (Highest Priority):**
-- Branding (BITMIND)
+- Branding (BITMIND) - Bitcoin Orange
 - Status indicators
 - Critical alerts
 
 **Level 2 (Medium Priority):**
 - Worker name
-- Hashrate
+- Hashrate - Bitcoin Orange accent
 - Connection status
 
 **Level 3 (Low Priority):**
@@ -181,7 +186,7 @@
 |                                  |
 |              BITMIND             |  H1 centered, size 4, white
 |                                  |
-|         Mining Device            |  H2 centered, size 3, green
+|         Mining Device            |  H2 centered, size 3, Bitcoin Orange
 |                                  |
 |       Initializing...            |  Body centered, size 2, white
 |                                  |
@@ -193,7 +198,7 @@
 **Design Details:**
 - Background: Black (0x0000)
 - Branding: Centered, size 4, white
-- Subtitle: Centered, size 3, green accent
+- Subtitle: Centered, size 3, Bitcoin Orange accent
 - Status: Centered, size 2, white
 - Loading Animation: Simple progress bar or spinner
 
@@ -221,8 +226,8 @@
 |                                  |
 |  Connect to WiFi:               |  H2 left-aligned, size 2, white
 |                                  |
-|  SSID: Bitmind_AP               |  Body left-aligned, size 2, green
-|  IP: 192.168.4.1                |  Body left-aligned, size 2, green
+|  SSID: Bitmind_AP               |  Body left-aligned, size 2, Bitcoin Orange
+|  IP: 192.168.4.1                |  Body left-aligned, size 2, Bitcoin Orange
 |                                  |
 |  Scan QR code or open:          |  H2 left-aligned, size 2, white
 |                                  |
@@ -241,15 +246,15 @@
 **Design Details:**
 - Background: Black (0x0000)
 - Header: Centered, size 3, white
-- WiFi Info: Left-aligned, size 2, green accent
+- WiFi Info: Left-aligned, size 2, Bitcoin Orange accent
 - URL: Left-aligned, size 2, light gray
 - QR Code: Centered, scale 4-5 (84-105px)
 - Instructions: Left-aligned, size 1, light gray
 
 **Color Usage:**
-- SSID/IP: Green accent (0x07E0)
+- SSID/IP: Bitcoin Orange accent (0xFD20)
 - URL: Light gray (0xC618)
-- Instructions: Light gray (0xC618)
+- Instructions: Light Gray (0xC618)
 
 **Memory Considerations:**
 - QR code rendering requires memory
@@ -270,11 +275,11 @@
 |                                  |
 |  Connecting to WiFi...          |  Body centered, size 2, white
 |                                  |
-|  [WiFi Icon]  Bitmind_AP         |  Icon + text, size 2, green
+|  [WiFi Icon]  Bitmind_AP         |  Icon + text, size 2, Bitcoin Orange
 |                                  |
 |  Connecting to backend...       |  Body centered, size 2, white
 |                                  |
-|  [Server Icon] getbitmind.com   |  Icon + text, size 2, green
+|  [Server Icon] getbitmind.com   |  Icon + text, size 2, Bitcoin Orange
 |                                  |
 |  Please wait...                 |  Body centered, size 2, light gray
 |                                  |
@@ -287,8 +292,8 @@
 - Background: Black (0x0000)
 - Header: Centered, size 3, white
 - Status Messages: Centered, size 2, white
-- Connection Targets: Size 2, green accent
-- Progress Bar: Horizontal, green accent
+- Connection Targets: Size 2, Bitcoin Orange accent
+- Progress Bar: Horizontal, Bitcoin Orange accent
 
 **Animation:**
 - Progress bar fills from left to right
@@ -337,7 +342,7 @@
 **Color Usage:**
 - Status: White (0xFFFF)
 - Device Info: Light gray (0xC618)
-- Icon: Green accent (0x07E0)
+- Icon: Bitcoin Orange accent (0xFD20)
 
 **Memory Considerations:**
 - Simple icon (drawn with primitives)
@@ -353,14 +358,14 @@
 **Layout Proposal 1 (Recommended):**
 ```
 +----------------------------------+
-|  BITMIND          [MINING]       |  Header bar, size 2, white/green
+|  BITMIND          [MINING]       |  Header bar, size 2, white/Bitcoin Orange
 +----------------------------------+  Separator line, gray
 |                                  |
 |  Worker: my-miner-01            |  H2 left-aligned, size 2, white
 |                                  |
-|  Hashrate: 12.5 MH/s            |  H2 left-aligned, size 3, green
+|  Hashrate: 12.5 MH/s            |  H2 left-aligned, size 3, Bitcoin Orange
 |                                  |
-|  Status: ● Mining               |  Body left-aligned, size 2, green
+|  Status: ● Mining               |  Body left-aligned, size 2, Bitcoin Orange
 |                                  |
 |  Pool: stratum+tcp://...        |  Body left-aligned, size 1, light gray
 |                                  |
@@ -373,13 +378,13 @@
 ```
 +----------------------------------+
 |              BITMIND             |  H1 centered, size 4, white
-|          [MINING]               |  Status right-aligned, size 2, green
+|          [MINING]               |  Status right-aligned, size 2, Bitcoin Orange
 +----------------------------------+  Separator line, gray
 |                                  |
 |  Worker: my-miner-01            |  H2 left-aligned, size 2, white
 |                                  |
-|  12.5 MH/s                      |  H1 centered, size 4, green
-|  ● Mining                       |  Body centered, size 2, green
+|  12.5 MH/s                      |  H1 centered, size 4, Bitcoin Orange
+|  ● Mining                       |  Body centered, size 2, Bitcoin Orange
 |                                  |
 |  Pool: stratum+tcp://...        |  Body left-aligned, size 1, light gray
 |  Uptime: 2h 34m                |  Body left-aligned, size 1, light gray
@@ -395,7 +400,7 @@
 |                                  |
 |  Worker: my-miner-01            |  H2 left-aligned, size 2, white
 |                                  |
-|  ● Mining                       |  Body left-aligned, size 2, green
+|  ● Mining                       |  Body left-aligned, size 2, Bitcoin Orange
 |                                  |
 |  Pool: stratum+tcp://...        |  Body left-aligned, size 1, light gray
 |  Uptime: 2h 34m                |  Body left-aligned, size 1, light gray
@@ -407,16 +412,16 @@
 
 **Design Details:**
 - Background: Black (0x0000)
-- Header Bar: Size 2, white text, green status
+- Header Bar: Size 2, white text, Bitcoin Orange status
 - Worker Name: Size 2, white
-- Hashrate: Size 3, green accent (prominent)
-- Status: Size 2, green with icon
+- Hashrate: Size 3, Bitcoin Orange accent (prominent)
+- Status: Size 2, Bitcoin Orange with icon
 - Pool/Uptime: Size 1, light gray
 
 **Color Usage:**
 - Header: White (0xFFFF)
-- Status: Green (0x07E0)
-- Hashrate: Green (0x07E0)
+- Status: Bitcoin Orange (0xFD20)
+- Hashrate: Bitcoin Orange (0xFD20)
 - Worker: White (0xFFFF)
 - Pool/Uptime: Light gray (0xC618)
 
@@ -428,7 +433,7 @@
 - Pool/Uptime: Size 1
 
 **Icons:**
-- Mining status: Circle ● (green)
+- Mining status: Circle ● (Bitcoin Orange)
 - Alternative: Simple drawn icon
 
 **Memory Considerations:**
@@ -470,6 +475,7 @@
 - Better organization
 
 **Professional Appearance:**
+- Bitcoin brand identity (orange accent)
 - Color hierarchy
 - Visual polish
 - Production-ready look
@@ -599,7 +605,9 @@
 **Color Rules:**
 - Black background (0x0000)
 - White primary text (0xFFFF)
-- Green accent (0x07E0)
+- Bitcoin Orange brand accent (0xFD20)
+- Green for success/connected (0x07E0)
+- Red for errors (0xF800)
 - Light gray secondary (0xC618)
 - Status colors for feedback
 
@@ -623,6 +631,7 @@
 - Phase T4: Touch integration (optional)
 
 **Design Goals Achieved:**
+- Bitcoin/mining product identity ✓
 - Professional production appearance ✓
 - Color hierarchy for visual clarity ✓
 - Larger typography for readability ✓
