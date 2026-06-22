@@ -18,9 +18,9 @@
 #include <mbedtls/sha256.h>
 
 // Display Architecture
-#include "src/display/DeviceState.h"
-#include "src/display/DisplayManager.h"
-#include "src/display/ScreenManager.h"
+#include "display/DeviceState.h"
+#include "display/DisplayManager.h"
+#include "display/ScreenManager.h"
 
 // ============================================================================
 // CONFIGURATION
