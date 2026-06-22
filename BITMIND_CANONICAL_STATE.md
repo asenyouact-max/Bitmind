@@ -320,6 +320,69 @@ All firmware implementation must follow BITMIND_FIRMWARE_ARCHITECTURE.md
 No feature additions without architecture update.
 
 ==============================================================================
+OLED TRACK
+==============================================================================
+
+**Phase O2 - Display Foundation Implementation:**
+- Status: COMPLETE
+- Date: 2026-06-22
+- Commit: cfb1d02
+
+**Achievements:**
+- DisplayManager introduced - OLED initialization and control
+- ScreenManager introduced - Screen routing and lifecycle
+- DeviceStateManager introduced - Centralized device state model
+- Screen lifecycle established - 6 initial screen types implemented
+- OLED firmware variant created - bitmind_oled_v1
+- Adafruit SSD1306 and GFX libraries integrated
+
+**Scope Compliance:**
+- No protocol changes
+- No backend changes
+- No mining changes
+- Display code consumes state, does not own business logic
+- Existing AP, registration, mining systems unchanged
+
+**Architecture:**
+- Display layer as presentation only
+- Loose coupling between display and business logic
+- Single source of truth for device state
+- Screen transitions driven by device state
+
+**Files Added:** 24 files, 2314 lines
+
+------------------------------------------------------------------------------
+
+**Phase O3 - AP Provisioning OLED Integration:**
+- Status: COMPLETE
+- Date: 2026-06-22
+- Commit: c276a24
+
+**Achievements:**
+- Existing AP provisioning integrated with OLED
+- Setup screen operational
+- AP status screen operational
+- OLED-driven provisioning workflow established
+- DeviceStateManager extended with AP SSID
+- Screen transitions verified (Setup → Connecting → Registering → Mining)
+
+**Scope Compliance:**
+- No protocol changes
+- No backend changes
+- No mining changes
+- Display code consumes state, does not own business logic
+- Existing AP, registration, mining systems unchanged
+
+**Architecture:**
+- Display layer as presentation only
+- Loose coupling between display and business logic
+- Single source of truth for device state
+- Screen transitions driven by device state
+- Existing AP provisioning system reused (no redesign)
+
+**Files Modified:** 4 files, 12 insertions, 4 deletions
+
+==============================================================================
 KNOWN COMPLETED FEATURES
 ==============================================================================
 
