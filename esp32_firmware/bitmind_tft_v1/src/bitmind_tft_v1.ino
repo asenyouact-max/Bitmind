@@ -13,11 +13,6 @@
 #include <Arduino.h>
 #include "display/DisplayManager.h"
 #include "display/ScreenManager.h"
-#include "display/screens/SplashScreen.h"
-#include "display/screens/SetupScreen.h"
-#include "display/screens/ConnectingScreen.h"
-#include "display/screens/RegisteringScreen.h"
-#include "display/screens/MiningScreen.h"
 
 // ============================================================================
 // CONFIGURATION
@@ -56,21 +51,10 @@ void setup() {
   if (displayManager->begin()) {
     Serial.println("[MAIN] DisplayManager initialized successfully");
     
-    // Initialize ScreenManager
+    // Initialize ScreenManager (creates all screens internally)
     Serial.println("[MAIN] Initializing ScreenManager...");
     screenManager = new ScreenManager(displayManager);
-    
-    // Register screens
-    Serial.println("[MAIN] Registering screens...");
-    screenManager->registerScreen("splash", new SplashScreen(displayManager));
-    screenManager->registerScreen("setup", new SetupScreen(displayManager));
-    screenManager->registerScreen("connecting", new ConnectingScreen(displayManager));
-    screenManager->registerScreen("registering", new RegisteringScreen(displayManager));
-    screenManager->registerScreen("mining", new MiningScreen(displayManager));
-    
-    // Start with splash screen
-    Serial.println("[MAIN] Starting with splash screen...");
-    screenManager->switchTo("splash");
+    screenManager->begin();
     
     Serial.println("[MAIN] Screen system ready");
   } else {
@@ -89,6 +73,7 @@ void loop() {
   // Phase T2: Screen system active
   if (screenManager) {
     screenManager->update();
+    screenManager->render();
   }
   delay(100);
 }
