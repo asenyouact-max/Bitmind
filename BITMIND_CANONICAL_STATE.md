@@ -304,7 +304,8 @@ BITMIND_FIRMWARE_ARCHITECTURE.md
 Firmware Variants:
 
 1. Legacy ESP Firmware (no screen)
-2. OLED Firmware (with screen)
+2. OLED Firmware (with screen) - ARCHIVED (Reference Implementation)
+3. TFT Firmware (with screen) - ACTIVE (Production Firmware)
 
 Shared Architecture:
 
@@ -465,6 +466,107 @@ OLED TRACK
 - Screen transitions driven by device state
 
 **Files Modified:** 4 files, 2 insertions, 20 deletions
+
+**Status:** ARCHIVED (Reference Implementation)
+**Reason:** Incompatible with production hardware (ESP32-2432S028)
+**Purpose:** Reference for display architecture patterns
+**Final Commit:** bb66379
+
+==============================================================================
+TFT TRACK
+==============================================================================
+
+**Phase T0 - Foundation Audit:**
+- Status: COMPLETE
+- Date: 2026-06-22
+- Commit: f3bb86a
+
+**Achievements:**
+- Hardware audit completed for ESP32-2432S028 (Cheap Yellow Display - CYD)
+- ILI9341 TFT controller specifications documented (240×320, 16-bit RGB)
+- XPT2046 touch controller specifications documented (resistive, separate SPI bus)
+- TFT_eSPI configuration requirements documented
+- Pin mapping validated (HSPI for display, VSPI for touch)
+- Memory impact analyzed (Flash: +120-170 KB, RAM: +5-10 KB partial buffer)
+- Architecture reuse evaluation completed (100% reuse except DisplayManager)
+- Display abstraction strategy defined (replace DisplayManager only)
+- Migration plan created (T1: DisplayManager, T2: Screens, T3: QR, T4: Touch)
+
+**Scope Compliance:**
+- Audit only (no code implementation)
+- No display driver integration
+- No touch implementation
+- No backend changes
+- No protocol changes
+- No mining changes
+
+**Architecture:**
+- **Reusable (100%):** DeviceStateManager, ScreenManager, screen lifecycle, state models
+- **Replaced:** DisplayManager (TFT_eSPI-based), display libraries, screen render() methods
+- **Unchanged:** Backend protocol, mining protocol, device protocol, all business logic
+
+**Files Added:**
+- BITMIND_DISPLAY_HARDWARE_AUDIT.md
+- BITMIND_TFT_PHASE_T0_AUDIT.md
+- BITMIND_TFT_ARCHITECTURE_PLAN.md
+- BITMIND_CANONICAL_STATE_UPDATE_REQUEST_T0.md
+
+**Architecture Decision:**
+- Create separate bitmind_tft_v1 firmware variant
+- Preserve OLED firmware variant as reference implementation
+- Reuse existing device architecture (DeviceState, ScreenManager, screen lifecycle)
+- Replace only DisplayManager layer (TFT_eSPI instead of Adafruit SSD1306)
+- No backend, protocol, or mining changes required
+
+**Production Hardware:** ESP32-2432S028 (Cheap Yellow Display - CYD)
+
+------------------------------------------------------------------------------
+
+**Phase T1 - DisplayManager Implementation:**
+- Status: COMPLETE
+- Date: 2026-06-22
+- Commit: 1fd6b40
+
+**Achievements:**
+- TFT firmware variant created (bitmind_tft_v1)
+- DisplayManager implemented with TFT_eSPI
+- ILI9341 driver configuration (240×320, 16-bit RGB)
+- SPI initialization (HSPI, 40 MHz)
+- Backlight control (GPIO 21)
+- Color support (16-bit RGB)
+- Serial logging implemented
+- Boot test validation (BITMIND, TFT INITIALIZED, ESP32-2432S028)
+- PlatformIO configuration created
+
+**Scope Compliance:**
+- DisplayManager implementation only
+- No touch implementation
+- No QR implementation (placeholder only)
+- No screen redesign
+- No onboarding changes
+- No backend changes
+- No protocol changes
+- No mining changes
+
+**Architecture:**
+- **Reusable (100%):** DeviceState, DeviceStateManager, ScreenManager, Screen lifecycle, all screen files
+- **Replaced:** DisplayManager (TFT_eSPI-based instead of Adafruit SSD1306)
+- **Unchanged:** Backend protocol, mining protocol, device protocol, all business logic
+
+**Files Added:**
+- esp32_firmware/bitmind_tft_v1/ (new directory)
+  - platformio.ini (TFT_eSPI configuration)
+  - src/bitmind_tft_v1.ino (main firmware entry)
+  - src/display/DisplayManager.h (TFT implementation)
+  - src/display/DisplayManager.cpp (TFT implementation)
+  - src/display/DeviceState.h (copied from OLED)
+  - src/display/DeviceState.cpp (copied from OLED)
+  - src/display/ScreenManager.h (copied from OLED)
+  - src/display/ScreenManager.cpp (copied from OLED)
+  - src/display/Screen.h (copied from OLED)
+  - src/display/screens/*.cpp (copied from OLED)
+- BITMIND_TFT_PHASE_T1_DELIVERABLES.md
+- BITMIND_CANONICAL_STATE_UPDATE_REQUEST_T1.md
 
 ==============================================================================
 KNOWN COMPLETED FEATURES
