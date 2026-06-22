@@ -100,7 +100,7 @@ void ScreenManager::render() {
   if (currentScreen && displayManager->isInitialized()) {
     displayManager->clear();
     currentScreen->render();
-    displayManager->display();
+    displayManager->refresh();
   }
 }
 

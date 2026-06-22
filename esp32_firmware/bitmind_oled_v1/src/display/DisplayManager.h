@@ -23,7 +23,7 @@ public:
   
   // Display Control
   void clear();
-  void display();
+  void refresh();
   void setBrightness(uint8_t brightness);
   
   // Drawing Primitives

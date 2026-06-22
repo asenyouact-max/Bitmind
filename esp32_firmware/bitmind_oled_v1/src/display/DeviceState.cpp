@@ -4,40 +4,40 @@
 DeviceState DeviceStateManager::state = {
   // WiFi State
   false,  // wifiConnected
-  "",     // wifiSSID
+  String(""),     // wifiSSID
   0,      // wifiRSSI
-  
+
   // Backend State
   false,  // backendConnected
-  "",     // backendHost
-  
+  String(""),     // backendHost
+
   // Registration State
   false,  // registered
-  "",     // deviceId
-  "",     // workerName
-  "",     // walletAddress
-  "",     // token
-  
+  String(""),     // deviceId
+  String(""),     // workerName
+  String(""),     // walletAddress
+  String(""),     // token
+
   // Mining State
   false,  // miningActive
-  "",     // jobId
+  String(""),     // jobId
   0.0f,   // hashrate
   0,      // acceptedShares
   0,      // rejectedShares
   0       // uptime
-  
+
   // System State
-  "IDLE", // status
-  "",     // lastError
+  String("IDLE"), // status
+  String(""),     // lastError
   0,      // lastErrorTime
-  
+
   // AP Mode State
   false,  // apMode
-  "",     // apSSID
-  ""      // apIP
-  
+  String(""),     // apSSID
+  String("")      // apIP
+
   // QR Code State
-  ""      // qrPayload
+  String("")      // qrPayload
 };
 
 const DeviceState& DeviceStateManager::getState() {

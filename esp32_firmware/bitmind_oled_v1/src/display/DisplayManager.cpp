@@ -49,7 +49,7 @@ void DisplayManager::clear() {
   }
 }
 
-void DisplayManager::display() {
+void DisplayManager::refresh() {
   if (initialized) {
     display.display();
   }
