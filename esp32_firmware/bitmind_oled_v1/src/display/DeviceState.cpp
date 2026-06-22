@@ -24,7 +24,7 @@ DeviceState DeviceStateManager::state = {
   0.0f,   // hashrate
   0,      // acceptedShares
   0,      // rejectedShares
-  0       // uptime
+  0,      // uptime
 
   // System State
   "IDLE", // status
@@ -34,7 +34,7 @@ DeviceState DeviceStateManager::state = {
   // AP Mode State
   false,  // apMode
   "",     // apSSID
-  ""      // apIP
+  "",     // apIP
 
   // QR Code State
   ""      // qrPayload
