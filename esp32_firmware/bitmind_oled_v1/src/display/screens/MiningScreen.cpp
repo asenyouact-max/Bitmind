@@ -13,11 +13,22 @@ void MiningScreen::onEnter() {
 void MiningScreen::render() {
   const DeviceState& state = DeviceStateManager::getState();
   
-  display->drawText(0, 0, "Worker: " + state.workerName.substring(0, 10));
-  display->drawText(0, 16, "Hash: " + String(state.hashrate, 1) + " H/s");
-  display->drawText(0, 32, "Acc: " + String(state.acceptedShares));
-  display->drawText(0, 40, "Rej: " + String(state.rejectedShares));
-  display->drawText(0, 56, "Up: " + String(state.uptime) + "s");
+  // Top bar: Branding + Status
+  display->drawText(0, 0, "BITMIND");
+  display->drawText(96, 0, state.status);
+  display->drawLine(0, 10, 127, 10);
+  
+  // Middle: Worker name
+  String workerDisplay = state.workerName;
+  if (workerDisplay.length() > 12) {
+    workerDisplay = workerDisplay.substring(0, 12);
+  }
+  display->drawText(0, 16, "Worker: " + workerDisplay);
+  
+  // Bottom: Hashrate (prominent) + Temperature + Status
+  display->drawText(0, 36, String(state.hashrate, 1) + " MH/s", 2);
+  display->drawText(96, 48, String((int)state.temperature) + "C");
+  display->drawText(56, 56, "● Mining");
 }
 
 void MiningScreen::update() {

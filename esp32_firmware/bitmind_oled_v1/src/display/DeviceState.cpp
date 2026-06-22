@@ -25,6 +25,7 @@ DeviceState DeviceStateManager::state = {
   0,      // acceptedShares
   0,      // rejectedShares
   0,      // uptime
+  0.0f    // temperature
   
   // System State
   "IDLE", // status
@@ -110,6 +111,10 @@ void DeviceStateManager::setRejectedShares(uint32_t shares) {
 
 void DeviceStateManager::setUptime(uint32_t uptime) {
   state.uptime = uptime;
+}
+
+void DeviceStateManager::setTemperature(float temperature) {
+  state.temperature = temperature;
 }
 
 // System State Updates

@@ -697,6 +697,15 @@ void updateHashRate() {
   }
 }
 
+void updateTemperature() {
+  // Read ESP32 internal temperature sensor
+  // Note: ESP32 internal temperature sensor is not very accurate
+  // For production, external sensor should be used
+  // This is a placeholder implementation
+  float temp = 45.0; // Placeholder value
+  DeviceStateManager::setTemperature(temp);
+}
+
 // ============================================================================
 // DISPLAY UPDATE
 // ============================================================================
@@ -812,6 +821,7 @@ void loop() {
   if (millis() - lastMining >= MINING_INTERVAL) {
     miningLoop();
     updateHashRate();
+    updateTemperature();
     lastMining = millis();
   }
   
