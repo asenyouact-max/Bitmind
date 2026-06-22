@@ -35,6 +35,7 @@ struct DeviceState {
   
   // AP Mode State
   bool apMode;
+  String apSSID;
   String apIP;
 };
 
@@ -73,6 +74,7 @@ public:
   
   // AP Mode State Updates
   static void setAPMode(bool apMode);
+  static void setAPSSID(const String& ssid);
   static void setAPIP(const String& ip);
   
 private:

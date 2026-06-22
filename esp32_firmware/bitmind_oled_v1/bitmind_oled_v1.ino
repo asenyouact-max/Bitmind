@@ -194,6 +194,7 @@ void startAPMode() {
   
   // Update device state
   DeviceStateManager::setAPMode(true);
+  DeviceStateManager::setAPSSID(AP_SSID);
   DeviceStateManager::setAPIP("192.168.4.1");
   DeviceStateManager::setStatus("SETUP");
   

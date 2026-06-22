@@ -33,6 +33,7 @@ DeviceState DeviceStateManager::state = {
   
   // AP Mode State
   false,  // apMode
+  "",     // apSSID
   ""      // apIP
 };
 
@@ -121,6 +122,10 @@ void DeviceStateManager::setLastError(const String& error) {
 // AP Mode State Updates
 void DeviceStateManager::setAPMode(bool apMode) {
   state.apMode = apMode;
+}
+
+void DeviceStateManager::setAPSSID(const String& ssid) {
+  state.apSSID = ssid;
 }
 
 void DeviceStateManager::setAPIP(const String& ip) {
