@@ -27,7 +27,6 @@ struct DeviceState {
   uint32_t acceptedShares;
   uint32_t rejectedShares;
   uint32_t uptime;
-  float temperature;
   
   // System State
   String status;  // "IDLE", "CONNECTING", "REGISTERING", "MINING", "ERROR", "SETUP"
@@ -71,7 +70,6 @@ public:
   static void setAcceptedShares(uint32_t shares);
   static void setRejectedShares(uint32_t shares);
   static void setUptime(uint32_t uptime);
-  static void setTemperature(float temperature);
   
   // System State Updates
   static void setStatus(const String& status);

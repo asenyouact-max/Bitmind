@@ -25,9 +25,8 @@ void MiningScreen::render() {
   }
   display->drawText(0, 16, "Worker: " + workerDisplay);
   
-  // Bottom: Hashrate (prominent) + Temperature + Status
+  // Bottom: Hashrate (prominent) + Status
   display->drawText(0, 36, String(state.hashrate, 1) + " MH/s", 2);
-  display->drawText(96, 48, String((int)state.temperature) + "C");
   display->drawText(56, 56, "● Mining");
 }
 
