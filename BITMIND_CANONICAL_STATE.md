@@ -382,6 +382,37 @@ OLED TRACK
 
 **Files Modified:** 4 files, 12 insertions, 4 deletions
 
+------------------------------------------------------------------------------
+
+**Phase O4 - QR Onboarding Implementation:**
+- Status: COMPLETE
+- Date: 2026-06-22
+- Commit: d96a229
+
+**Achievements:**
+- QR onboarding implemented
+- State-driven QR payload architecture
+- OLED setup workflow enhanced
+- QR code generation using ricmoo/QRCode library
+- QR code display on OLED in AP mode
+- Manual URL fallback remains visible
+
+**Scope Compliance:**
+- No protocol changes
+- No backend changes
+- No mining changes
+- Display code consumes state, does not own business logic
+- Existing AP, registration, mining systems unchanged
+
+**Architecture:**
+- Display layer as presentation only
+- Loose coupling between display and business logic
+- Single source of truth for device state
+- Screen transitions driven by device state
+- QR payload state-driven (not hardcoded in display code)
+
+**Files Modified:** 7 files, 63 insertions, 2 deletions
+
 ==============================================================================
 KNOWN COMPLETED FEATURES
 ==============================================================================
