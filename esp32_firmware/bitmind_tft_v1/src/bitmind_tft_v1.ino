@@ -1,16 +1,23 @@
 /*
  * Bitmind TFT Firmware v1
- * Phase T1 - DisplayManager Implementation
+ * Phase T2 - Screen Layout Implementation
  * Target: ESP32-2432S028 (Cheap Yellow Display - CYD)
- * Display: ILI9341 TFT 240x320
+ * Display: ILI9341 TFT 320x240 landscape
  * 
  * Authoritative Documents:
  * - BITMIND_TFT_ARCHITECTURE_PLAN.md
  * - BITMIND_TFT_PHASE_T0_AUDIT.md
+ * - BITMIND_TFT_PHASE_T2_DESIGN_REVIEW.md
  */
 
 #include <Arduino.h>
 #include "display/DisplayManager.h"
+#include "display/ScreenManager.h"
+#include "display/screens/SplashScreen.h"
+#include "display/screens/SetupScreen.h"
+#include "display/screens/ConnectingScreen.h"
+#include "display/screens/RegisteringScreen.h"
+#include "display/screens/MiningScreen.h"
 
 // ============================================================================
 // CONFIGURATION
@@ -24,6 +31,7 @@
 // ============================================================================
 
 DisplayManager* displayManager = nullptr;
+ScreenManager* screenManager = nullptr;
 
 // ============================================================================
 // SETUP
@@ -35,7 +43,7 @@ void setup() {
   
   Serial.println("========================================");
   Serial.println("BITMIND TFT FIRMWARE v1");
-  Serial.println("Phase T1 - DisplayManager Implementation");
+  Serial.println("Phase T2 - Screen Layout Implementation");
   Serial.println("========================================");
   Serial.printf("Firmware Version: %s\n", FIRMWARE_VERSION);
   Serial.printf("Device Type: %s\n", DEVICE_TYPE);
@@ -48,21 +56,23 @@ void setup() {
   if (displayManager->begin()) {
     Serial.println("[MAIN] DisplayManager initialized successfully");
     
-    // Display test message
-    displayManager->clear();
-    displayManager->setForegroundColor(TFT_FG_COLOR);
-    displayManager->setBackgroundColor(TFT_BG_COLOR);
+    // Initialize ScreenManager
+    Serial.println("[MAIN] Initializing ScreenManager...");
+    screenManager = new ScreenManager(displayManager);
     
-    // Display "BITMIND" centered
-    displayManager->setTextCentered(40, "BITMIND", 3);
+    // Register screens
+    Serial.println("[MAIN] Registering screens...");
+    screenManager->registerScreen("splash", new SplashScreen(displayManager));
+    screenManager->registerScreen("setup", new SetupScreen(displayManager));
+    screenManager->registerScreen("connecting", new ConnectingScreen(displayManager));
+    screenManager->registerScreen("registering", new RegisteringScreen(displayManager));
+    screenManager->registerScreen("mining", new MiningScreen(displayManager));
     
-    // Display "TFT INITIALIZED" centered
-    displayManager->setTextCentered(100, "TFT INITIALIZED", 2);
+    // Start with splash screen
+    Serial.println("[MAIN] Starting with splash screen...");
+    screenManager->switchTo("splash");
     
-    // Display "ESP32-2432S028" centered
-    displayManager->setTextCentered(160, "ESP32-2432S028", 2);
-    
-    Serial.println("[MAIN] Test message displayed");
+    Serial.println("[MAIN] Screen system ready");
   } else {
     Serial.println("[MAIN] ERROR: DisplayManager initialization failed");
   }
@@ -76,7 +86,9 @@ void setup() {
 // ============================================================================
 
 void loop() {
-  // Phase T1: DisplayManager test only
-  // No additional logic in this phase
-  delay(1000);
+  // Phase T2: Screen system active
+  if (screenManager) {
+    screenManager->update();
+  }
+  delay(100);
 }

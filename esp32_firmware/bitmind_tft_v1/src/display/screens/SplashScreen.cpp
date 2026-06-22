@@ -9,8 +9,21 @@ void SplashScreen::onEnter() {
 }
 
 void SplashScreen::render() {
-  display->drawTextCentered(0, "BITMIND", 2);
-  display->drawTextCentered(24, "OLED Miner", 1);
-  display->drawTextCentered(48, "v1.0.0", 1);
-  display->drawTextCentered(56, "Initializing...", 1);
+  display->fillScreen(TFT_BG_COLOR);
+  
+  // Branding - BITMIND (centered, size 4, white)
+  display->setForegroundColor(TFT_FG_COLOR);
+  display->drawTextCentered(80, "BITMIND", 4);
+  
+  // Subtitle - Mining Device (centered, size 3, Bitcoin Orange)
+  display->setForegroundColor(TFT_BRAND_COLOR);
+  display->drawTextCentered(130, "Mining Device", 3);
+  
+  // Status - Initializing... (centered, size 2, white)
+  display->setForegroundColor(TFT_FG_COLOR);
+  display->drawTextCentered(180, "Initializing...", 2);
+  
+  // Loading animation placeholder (simple progress bar)
+  display->setForegroundColor(TFT_BRAND_COLOR);
+  display->fillRect(60, 220, 200, 10);
 }

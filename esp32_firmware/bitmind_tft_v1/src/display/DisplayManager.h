@@ -9,12 +9,15 @@
 #define TFT_HEIGHT 320
 #define TFT_BL     21  // Backlight control pin
 
-// Color definitions
+// Color definitions - Bitcoin Orange Brand Identity
 #define TFT_BG_COLOR      0x0000  // Black
 #define TFT_FG_COLOR      0xFFFF  // White
-#define TFT_ACCENT_COLOR  0x07E0  // Green
+#define TFT_BRAND_COLOR   0xFD20  // Bitcoin Orange (brand accent)
+#define TFT_SUCCESS_COLOR 0x07E0  // Green (success/connected only)
 #define TFT_ERROR_COLOR   0xF800  // Red
-#define TFT_WARN_COLOR    0xFD20  // Orange
+#define TFT_WARN_COLOR    0xFD20  // Orange (warning/activity)
+#define TFT_INFO_COLOR    0x001F  // Blue
+#define TFT_GRAY_COLOR    0xC618  // Light gray (secondary text)
 
 class DisplayManager {
 public:
