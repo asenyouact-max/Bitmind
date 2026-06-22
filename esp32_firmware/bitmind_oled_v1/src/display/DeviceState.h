@@ -37,6 +37,9 @@ struct DeviceState {
   bool apMode;
   String apSSID;
   String apIP;
+  
+  // QR Code State
+  String qrPayload;
 };
 
 class DeviceStateManager {
@@ -76,6 +79,9 @@ public:
   static void setAPMode(bool apMode);
   static void setAPSSID(const String& ssid);
   static void setAPIP(const String& ip);
+  
+  // QR Code State Updates
+  static void setQRPayload(const String& payload);
   
 private:
   static DeviceState state;

@@ -105,6 +105,45 @@ void DisplayManager::drawPixel(int x, int y) {
   }
 }
 
+void DisplayManager::drawQRCode(int x, int y, const String& data, uint8_t scale) {
+  if (!initialized || data.isEmpty()) {
+    return;
+  }
+  
+  // Create QR code
+  QRCode qrcode;
+  uint8_t qrcodeData[qrcode_getBufferSize(QR_VERSION)];
+  qrcode_initText(&qrcode, qrcodeData, QR_VERSION, ECC_MEDIUM, data.c_str());
+  
+  // Draw QR code
+  for (uint8_t j = 0; j < qrcode.size; j++) {
+    for (uint8_t i = 0; i < qrcode.size; i++) {
+      if (qrcode_getModule(&qrcode, i, j)) {
+        // Draw filled module
+        display.fillRect(x + i * scale, y + j * scale, scale, scale, SSD1306_WHITE);
+      }
+    }
+  }
+}
+
+void DisplayManager::drawQRCodeCentered(int y, const String& data, uint8_t scale) {
+  if (!initialized || data.isEmpty()) {
+    return;
+  }
+  
+  // Create QR code to determine size
+  QRCode qrcode;
+  uint8_t qrcodeData[qrcode_getBufferSize(QR_VERSION)];
+  qrcode_initText(&qrcode, qrcodeData, QR_VERSION, ECC_MEDIUM, data.c_str());
+  
+  // Calculate centered position
+  int qrWidth = qrcode.size * scale;
+  int x = (SCREEN_WIDTH - qrWidth) / 2;
+  
+  // Draw QR code
+  drawQRCode(x, y, data, scale);
+}
+
 bool DisplayManager::isInitialized() const {
   return initialized;
 }

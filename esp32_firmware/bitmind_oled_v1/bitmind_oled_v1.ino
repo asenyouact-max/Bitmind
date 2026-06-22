@@ -196,6 +196,7 @@ void startAPMode() {
   DeviceStateManager::setAPMode(true);
   DeviceStateManager::setAPSSID(AP_SSID);
   DeviceStateManager::setAPIP("192.168.4.1");
+  DeviceStateManager::setQRPayload("http://192.168.4.1");
   DeviceStateManager::setStatus("SETUP");
   
   // Setup web server

@@ -35,6 +35,9 @@ DeviceState DeviceStateManager::state = {
   false,  // apMode
   "",     // apSSID
   ""      // apIP
+  
+  // QR Code State
+  ""      // qrPayload
 };
 
 const DeviceState& DeviceStateManager::getState() {
@@ -130,4 +133,9 @@ void DeviceStateManager::setAPSSID(const String& ssid) {
 
 void DeviceStateManager::setAPIP(const String& ip) {
   state.apIP = ip;
+}
+
+// QR Code State Updates
+void DeviceStateManager::setQRPayload(const String& payload) {
+  state.qrPayload = payload;
 }

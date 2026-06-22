@@ -5,11 +5,13 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <qrcode.h>
 
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 #define OLED_RESET -1
 #define SCREEN_ADDRESS 0x3C
+#define QR_VERSION 2
 
 class DisplayManager {
 public:
@@ -31,6 +33,10 @@ public:
   void drawRect(int x, int y, int w, int h);
   void fillRect(int x, int y, int w, int h);
   void drawPixel(int x, int y);
+  
+  // QR Code Drawing
+  void drawQRCode(int x, int y, const String& data, uint8_t scale = 1);
+  void drawQRCodeCentered(int y, const String& data, uint8_t scale = 1);
   
   // Display Info
   bool isInitialized() const;
