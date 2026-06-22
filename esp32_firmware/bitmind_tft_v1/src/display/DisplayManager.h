@@ -47,8 +47,8 @@ public:
   
   // State
   bool isInitialized() const;
-  int getWidth() const;
-  int getHeight() const;
+  int getWidth();
+  int getHeight();
   TFT_eSPI& getDisplay();
   
   // TFT-specific methods
