@@ -98,9 +98,13 @@ void ScreenManager::update() {
 
 void ScreenManager::render() {
   if (currentScreen && displayManager->isInitialized()) {
+    Serial.println("[DEBUG] ScreenManager::render: clearing display");
     displayManager->clear();
+    Serial.println("[DEBUG] ScreenManager::render: calling currentScreen->render()");
     currentScreen->render();
+    Serial.println("[DEBUG] ScreenManager::render: calling displayManager->refresh()");
     displayManager->refresh();
+    Serial.println("[DEBUG] ScreenManager::render: completed");
   }
 }
 

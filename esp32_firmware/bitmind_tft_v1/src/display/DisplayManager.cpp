@@ -74,15 +74,18 @@ void DisplayManager::setBrightness(uint8_t brightness) {
 
 void DisplayManager::drawText(int x, int y, const String& text, uint8_t size) {
   if (initialized) {
+    Serial.printf("[DEBUG] drawText: x=%d, y=%d, text='%s', size=%d\n", x, y, text.c_str(), size);
     display.setTextSize(size);
     display.setTextColor(foregroundColor, backgroundColor);
     display.setCursor(x, y);
     display.print(text);
+    Serial.println("[DEBUG] drawText: completed");
   }
 }
 
 void DisplayManager::drawTextCentered(int y, const String& text, uint8_t size) {
   if (initialized) {
+    Serial.printf("[DEBUG] drawTextCentered: y=%d, text='%s', size=%d\n", y, text.c_str(), size);
     display.setTextSize(size);
     display.setTextColor(foregroundColor, backgroundColor);
     
@@ -91,6 +94,7 @@ void DisplayManager::drawTextCentered(int y, const String& text, uint8_t size) {
     int x = (display.width() - textWidth) / 2;
     display.setCursor(x, y);
     display.print(text);
+    Serial.println("[DEBUG] drawTextCentered: completed");
   }
 }
 
@@ -108,7 +112,9 @@ void DisplayManager::drawRect(int x, int y, int w, int h) {
 
 void DisplayManager::fillRect(int x, int y, int w, int h) {
   if (initialized) {
+    Serial.printf("[DEBUG] fillRect: x=%d, y=%d, w=%d, h=%d, color=0x%04X\n", x, y, w, h, foregroundColor);
     display.fillRect(x, y, w, h, foregroundColor);
+    Serial.println("[DEBUG] fillRect: completed");
   }
 }
 
