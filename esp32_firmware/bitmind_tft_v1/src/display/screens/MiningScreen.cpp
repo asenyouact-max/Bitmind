@@ -3,6 +3,7 @@
 
 MiningScreen::MiningScreen(DisplayManager* displayManager)
   : Screen(displayManager), lastUpdate(0) {
+  Serial.printf("[LIFECYCLE] MiningScreen::MiningScreen() - this=%p\n", this);
 }
 
 void MiningScreen::onEnter() {

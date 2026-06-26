@@ -47,6 +47,7 @@ void setup() {
   // Initialize DisplayManager
   Serial.println("[MAIN] Initializing DisplayManager...");
   displayManager = new DisplayManager();
+  Serial.printf("[MAIN] DisplayManager created at %p\n", displayManager);
   
   if (displayManager->begin()) {
     Serial.println("[MAIN] DisplayManager initialized successfully");
@@ -54,6 +55,7 @@ void setup() {
     // Initialize ScreenManager (creates all screens internally)
     Serial.println("[MAIN] Initializing ScreenManager...");
     screenManager = new ScreenManager(displayManager);
+    Serial.printf("[MAIN] ScreenManager created at %p\n", screenManager);
     screenManager->begin();
     
     Serial.println("[MAIN] Screen system ready");

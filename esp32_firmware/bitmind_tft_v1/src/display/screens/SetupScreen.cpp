@@ -3,6 +3,7 @@
 
 SetupScreen::SetupScreen(DisplayManager* displayManager)
   : Screen(displayManager) {
+  Serial.printf("[LIFECYCLE] SetupScreen::SetupScreen() - this=%p\n", this);
 }
 
 void SetupScreen::onEnter() {

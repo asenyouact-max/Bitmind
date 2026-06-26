@@ -3,6 +3,7 @@
 
 ConnectingScreen::ConnectingScreen(DisplayManager* displayManager)
   : Screen(displayManager) {
+  Serial.printf("[LIFECYCLE] ConnectingScreen::ConnectingScreen() - this=%p\n", this);
 }
 
 void ConnectingScreen::onEnter() {

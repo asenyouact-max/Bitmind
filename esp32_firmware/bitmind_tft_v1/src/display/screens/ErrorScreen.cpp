@@ -3,6 +3,7 @@
 
 ErrorScreen::ErrorScreen(DisplayManager* displayManager)
   : Screen(displayManager) {
+  Serial.printf("[LIFECYCLE] ErrorScreen::ErrorScreen() - this=%p\n", this);
 }
 
 void ErrorScreen::onEnter() {

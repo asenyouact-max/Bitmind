@@ -3,6 +3,7 @@
 
 RegisteringScreen::RegisteringScreen(DisplayManager* displayManager)
   : Screen(displayManager) {
+  Serial.printf("[LIFECYCLE] RegisteringScreen::RegisteringScreen() - this=%p\n", this);
 }
 
 void RegisteringScreen::onEnter() {

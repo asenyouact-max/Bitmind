@@ -6,9 +6,11 @@ DisplayManager::DisplayManager()
     foregroundColor(TFT_FG_COLOR),
     backgroundColor(TFT_BG_COLOR),
     brightness(255) {
+  Serial.printf("[LIFECYCLE] DisplayManager::DisplayManager() - this=%p, &display=%p\n", this, &display);
 }
 
 DisplayManager::~DisplayManager() {
+  Serial.printf("[LIFECYCLE] DisplayManager::~DisplayManager() - this=%p\n", this);
   end();
 }
 

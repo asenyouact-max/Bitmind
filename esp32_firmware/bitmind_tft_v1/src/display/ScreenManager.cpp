@@ -16,9 +16,11 @@ ScreenManager::ScreenManager(DisplayManager* displayManager)
     registeringScreen(nullptr),
     miningScreen(nullptr),
     errorScreen(nullptr) {
+  Serial.printf("[LIFECYCLE] ScreenManager::ScreenManager() - this=%p, displayManager=%p\n", this, displayManager);
 }
 
 ScreenManager::~ScreenManager() {
+  Serial.printf("[LIFECYCLE] ScreenManager::~ScreenManager() - this=%p\n", this);
   end();
 }
 

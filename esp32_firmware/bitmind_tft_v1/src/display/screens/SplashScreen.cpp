@@ -2,6 +2,7 @@
 
 SplashScreen::SplashScreen(DisplayManager* displayManager)
   : Screen(displayManager) {
+  Serial.printf("[LIFECYCLE] SplashScreen::SplashScreen() - this=%p\n", this);
 }
 
 void SplashScreen::onEnter() {
