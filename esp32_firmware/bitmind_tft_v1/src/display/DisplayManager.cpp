@@ -86,8 +86,8 @@ void DisplayManager::drawTextCentered(int y, const String& text, uint8_t size) {
     display.setTextSize(size);
     display.setTextColor(foregroundColor, backgroundColor);
     
-    // Use TFT_eSPI textWidth() instead of getTextBounds
-    int textWidth = display.textWidth(text);
+    // Use TFT_eSPI textWidth() - convert String to c_str() for compatibility
+    int textWidth = display.textWidth(text.c_str());
     int x = (display.width() - textWidth) / 2;
     display.setCursor(x, y);
     display.print(text);
