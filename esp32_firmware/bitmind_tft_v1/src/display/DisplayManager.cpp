@@ -86,8 +86,8 @@ void DisplayManager::drawTextCentered(int y, const String& text, uint8_t size) {
     display.setTextSize(size);
     display.setTextColor(foregroundColor, backgroundColor);
     
-    // Use TFT_eSPI textWidth() - convert String to c_str() for compatibility
-    int textWidth = display.textWidth(text.c_str());
+    // Use library-independent text width calculation
+    int textWidth = calculateTextWidth(text, size);
     int x = (display.width() - textWidth) / 2;
     display.setCursor(x, y);
     display.print(text);
@@ -172,4 +172,12 @@ void DisplayManager::fillScreen(uint16_t color) {
   if (initialized) {
     display.fillScreen(color);
   }
+}
+
+int DisplayManager::calculateTextWidth(const String& text, uint8_t size) {
+  // Library-independent text width calculation
+  // Based on standard TFT_eSPI font widths
+  // Size 1: 6px, Size 2: 12px, Size 3: 18px, Size 4: 24px, Size 6: 48px
+  int charWidth = 6 * size;
+  return text.length() * charWidth;
 }

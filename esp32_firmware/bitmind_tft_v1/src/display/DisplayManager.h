@@ -63,6 +63,9 @@ private:
   uint16_t foregroundColor;
   uint16_t backgroundColor;
   uint8_t brightness;
+  
+  // Library-independent text width calculation
+  int calculateTextWidth(const String& text, uint8_t size);
 };
 
 #endif // DISPLAY_MANAGER_H
