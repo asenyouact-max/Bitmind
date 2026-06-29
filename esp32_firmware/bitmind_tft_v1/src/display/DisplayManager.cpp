@@ -1,7 +1,7 @@
 #include "DisplayManager.h"
 
 DisplayManager::DisplayManager() 
-  : display(TFT_WIDTH, TFT_HEIGHT),
+  : display(),
     initialized(false),
     foregroundColor(TFT_FG_COLOR),
     backgroundColor(TFT_BG_COLOR),
