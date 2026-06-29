@@ -80,7 +80,7 @@ void DisplayManager::drawText(int x, int y, const String& text, uint8_t size) {
     display.setTextSize(size);
     display.setTextColor(foregroundColor, backgroundColor);
     display.setCursor(x, y);
-    display.print(text);
+    display.print(text.c_str());  // Convert to const char* to avoid Arduino String
     Serial.println("[DEBUG] drawText: completed");
   }
 }
@@ -95,7 +95,7 @@ void DisplayManager::drawTextCentered(int y, const String& text, uint8_t size) {
     int textWidth = calculateTextWidth(text, size);
     int x = (display.width() - textWidth) / 2;
     display.setCursor(x, y);
-    display.print(text);
+    display.print(text.c_str());  // Convert to const char* to avoid Arduino String
     Serial.println("[DEBUG] drawTextCentered: completed");
   }
 }

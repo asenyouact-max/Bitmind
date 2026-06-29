@@ -20,6 +20,9 @@ void ConnectingScreen::render() {
   // Header - CONNECTING (centered, size 3, white)
   Serial.println("[DEBUG] ConnectingScreen::render: setting foreground color to white");
   display->setForegroundColor(TFT_FG_COLOR);
+  Serial.println("[DEBUG] ConnectingScreen::render: DEBUG - testing direct print with literal");
+  display->getDisplay().setCursor(80, 20);
+  display->getDisplay().print("CONNECTING");
   Serial.println("[DEBUG] ConnectingScreen::render: calling drawTextCentered for CONNECTING");
   display->drawTextCentered(20, "CONNECTING", 3);
   
