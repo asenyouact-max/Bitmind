@@ -17,19 +17,23 @@ DisplayManager::~DisplayManager() {
 bool DisplayManager::begin() {
   Serial.println("[TFT] Initializing display...");
   
-  // Initialize TFT_eSPI
+  // Initialize TFT_eSPI (identical to hardware_test)
   display.begin();
   
-  // Set rotation to landscape (320x240)
+  // Set rotation to landscape (identical to hardware_test)
   display.setRotation(1);
   
-  // Fill screen with background color
+  // Fill screen with background color (identical to hardware_test)
   display.fillScreen(backgroundColor);
   
-  // Set default text color and size
+  // Set default text color (identical to hardware_test)
   display.setTextColor(foregroundColor, backgroundColor);
+  
+  // Set default text size (hardware_test uses 2, but we use 1 for flexibility)
   display.setTextSize(1);
-  display.setCursor(0, 0);
+  
+  // Note: Don't set cursor here - let each render call set it
+  // hardware_test sets cursor immediately before print()
   
   // Enable backlight
   pinMode(TFT_BL, OUTPUT);
