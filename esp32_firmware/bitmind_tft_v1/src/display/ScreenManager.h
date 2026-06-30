@@ -38,6 +38,7 @@ private:
   DisplayManager* displayManager;
   Screen* currentScreen;
   Screen* previousScreen;
+  bool renderDirty;  // Phase T2.7: Render only when screen changes
   
   // Screen instances
   SplashScreen* splashScreen;

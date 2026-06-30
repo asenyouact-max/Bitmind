@@ -10,6 +10,7 @@ ScreenManager::ScreenManager(DisplayManager* displayManager)
   : displayManager(displayManager),
     currentScreen(nullptr),
     previousScreen(nullptr),
+    renderDirty(true),
     splashScreen(nullptr),
     setupScreen(nullptr),
     connectingScreen(nullptr),
@@ -99,14 +100,16 @@ void ScreenManager::update() {
 }
 
 void ScreenManager::render() {
+  // Phase T2.7: Only render when dirty (screen changed or state changed)
+  if (!renderDirty) {
+    return;
+  }
+  
   if (currentScreen && displayManager->isInitialized()) {
-    Serial.println("[DEBUG] ScreenManager::render: clearing display");
     displayManager->clear();
-    Serial.println("[DEBUG] ScreenManager::render: calling currentScreen->render()");
     currentScreen->render();
-    Serial.println("[DEBUG] ScreenManager::render: calling displayManager->refresh()");
     displayManager->refresh();
-    Serial.println("[DEBUG] ScreenManager::render: completed");
+    renderDirty = false;  // Clear dirty flag after render
   }
 }
 
@@ -147,5 +150,6 @@ void ScreenManager::switchScreen(Screen* newScreen) {
     currentScreen->onEnter();
   }
   
+  renderDirty = true;  // Phase T2.7: Mark dirty on screen transition
   Serial.println("[SCREEN_MANAGER] Transitioned to screen");
 }
