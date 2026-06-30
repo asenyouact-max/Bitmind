@@ -14,6 +14,12 @@
 #include <TFT_eSPI.h>
 #include "display/DisplayManager.h"
 #include "display/ScreenManager.h"
+#include "display/screens/SplashScreen.h"
+#include "display/screens/SetupScreen.h"
+#include "display/screens/ConnectingScreen.h"
+#include "display/screens/RegisteringScreen.h"
+#include "display/screens/MiningScreen.h"
+#include "display/screens/ErrorScreen.h"
 
 // ============================================================================
 // CONFIGURATION
@@ -21,6 +27,9 @@
 
 #define FIRMWARE_VERSION "1.0.0"
 #define DEVICE_TYPE "tft_miner"
+
+// Phase T2.8: Temporary validation mode
+#define VALIDATION_MODE 1
 
 // ============================================================================
 // GLOBAL OBJECTS
@@ -31,6 +40,13 @@ TFT_eSPI tft = TFT_eSPI();
 
 DisplayManager* displayManager = nullptr;
 ScreenManager* screenManager = nullptr;
+
+// Phase T2.8: Validation mode state
+#if VALIDATION_MODE
+unsigned long lastScreenChange = 0;
+int currentValidationScreen = 0;
+const int NUM_VALIDATION_SCREENS = 6;
+#endif
 
 // ============================================================================
 // SETUP
@@ -76,10 +92,47 @@ void setup() {
 // ============================================================================
 
 void loop() {
+#if VALIDATION_MODE
+  // Phase T2.8: Validation mode - cycle through all screens every 3 seconds
+  if (screenManager && millis() - lastScreenChange >= 3000) {
+    lastScreenChange = millis();
+    currentValidationScreen = (currentValidationScreen + 1) % NUM_VALIDATION_SCREENS;
+    
+    Serial.printf("[VALIDATION] Switching to screen %d\n", currentValidationScreen);
+    
+    switch (currentValidationScreen) {
+      case 0:
+        screenManager->transitionTo<SplashScreen>();
+        break;
+      case 1:
+        screenManager->transitionTo<SetupScreen>();
+        break;
+      case 2:
+        screenManager->transitionTo<ConnectingScreen>();
+        break;
+      case 3:
+        screenManager->transitionTo<RegisteringScreen>();
+        break;
+      case 4:
+        screenManager->transitionTo<MiningScreen>();
+        break;
+      case 5:
+        screenManager->transitionTo<ErrorScreen>();
+        break;
+    }
+  }
+  
+  if (screenManager) {
+    screenManager->update();
+    screenManager->render();
+  }
+  delay(100);
+#else
   // Phase T2: Screen system active
   if (screenManager) {
     screenManager->update();
     screenManager->render();
   }
   delay(100);
+#endif
 }
