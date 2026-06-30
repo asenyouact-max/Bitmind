@@ -2,6 +2,8 @@
 #define RUNTIME_STATE_MACHINE_H
 
 #include <Arduino.h>
+#include "WiFiManager.h"
+#include "BackendManager.h"
 
 // Runtime states
 enum class RuntimeState {
@@ -41,6 +43,17 @@ public:
 private:
   RuntimeState currentState;
   RuntimeState previousState;
+  
+  // Runtime managers
+  WiFiManager* wifiManager;
+  BackendManager* backendManager;
+  
+  // Configuration cache
+  String cachedSSID;
+  String cachedPassword;
+  String cachedBackendHost;
+  uint16_t cachedBackendPort;
+  String cachedBackendPath;
   
   // State handlers
   void handleState();

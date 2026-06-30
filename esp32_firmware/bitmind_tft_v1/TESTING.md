@@ -7,6 +7,8 @@ The project includes validation test sketches for testing specific phases:
 - `src/test_storage_identity.ino` - Phase T3.1 validation (storage + device identity)
 - `src/test_runtime_state_machine.ino` - Phase T3.2 validation (runtime state machine)
 
+**Note:** Test sketches are removed from production `src/` after validation. Use the procedures below to recreate them if needed.
+
 ## How to Run Validation Tests
 
 ### Step 1: Backup Main Firmware
@@ -54,6 +56,31 @@ cp bitmind_tft_v1.ino.backup bitmind_tft_v1.ino
 - State transitions follow expected flow (BOOT → CHECK_CONFIG → AP_MODE or WIFI_CONNECTING)
 - DeviceStateManager status is updated on state changes
 - DeviceStateManager deviceId is set from DeviceIdentity
+
+### T3.3 Validation (WiFi and Backend Connectivity)
+**Prerequisites:**
+- Device must have valid WiFi credentials stored in NV storage
+- Backend server must be accessible at configured host/port
+
+**Validation Steps:**
+1. Ensure configuration is stored (use T3.1 test to save credentials if needed)
+2. Upload main firmware to device
+3. Monitor serial output at 115200 baud
+4. Verify state progression: BOOT → CHECK_CONFIG → WIFI_CONNECTING → WIFI_CONNECTED → BACKEND_CONNECTING → REGISTERING
+5. Verify WiFi connection succeeds (IP address assigned)
+6. Verify DeviceStateManager receives WiFi status updates
+7. Verify backend connection attempt is made
+8. Verify DeviceStateManager receives backend status updates
+9. Test disconnect handling (power off WiFi router, observe reconnection logic)
+
+**Expected Results:**
+- Device boots and loads stored credentials
+- WiFi connection succeeds within timeout
+- DeviceStateManager WiFi status updates to CONNECTED
+- Backend connection attempt is made
+- DeviceStateManager backend status updates
+- No display layer modifications required
+- Main loop remains responsive (no blocking)
 
 ## Notes
 

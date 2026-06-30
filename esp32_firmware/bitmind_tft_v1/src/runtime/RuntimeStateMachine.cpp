@@ -5,20 +5,41 @@
 
 RuntimeStateMachine::RuntimeStateMachine()
   : currentState(RuntimeState::BOOT),
-    previousState(RuntimeState::BOOT) {
+    previousState(RuntimeState::BOOT),
+    wifiManager(nullptr),
+    backendManager(nullptr),
+    cachedBackendPort(0) {
+  
+  wifiManager = new WiFiManager();
+  backendManager = new BackendManager();
 }
 
 RuntimeStateMachine::~RuntimeStateMachine() {
+  delete wifiManager;
+  delete backendManager;
 }
 
 void RuntimeStateMachine::begin() {
   Serial.println("[RSM] RuntimeStateMachine initializing...");
   currentState = RuntimeState::BOOT;
   previousState = RuntimeState::BOOT;
+  
+  // Initialize managers
+  wifiManager->begin();
+  backendManager->begin();
+  
   Serial.println("[RSM] Initial state: BOOT");
 }
 
 void RuntimeStateMachine::update() {
+  // Update managers
+  if (wifiManager) {
+    wifiManager->update();
+  }
+  if (backendManager) {
+    backendManager->update();
+  }
+  
   handleState();
 }
 
@@ -108,10 +129,18 @@ void RuntimeStateMachine::handleCheckConfig() {
   Serial.println("[RSM] CHECK_CONFIG: Checking configuration availability...");
   
   ConfigManager configManager;
-  bool hasConfig = configManager.hasConfiguration();
+  Config config;
   
-  if (hasConfig) {
-    Serial.println("[RSM] Configuration found, proceeding to WiFi connection");
+  if (configManager.loadConfiguration(config)) {
+    Serial.println("[RSM] Configuration found, caching credentials");
+    cachedSSID = config.ssid;
+    cachedPassword = config.password;
+    
+    // Backend connection details (hardcoded for T3.3, will be configurable later)
+    cachedBackendHost = "backend.bitmind.io";
+    cachedBackendPort = 8080;
+    cachedBackendPath = "/ws";
+    
     transitionTo(RuntimeState::WIFI_CONNECTING);
   } else {
     Serial.println("[RSM] No configuration found, entering AP mode");
@@ -130,29 +159,91 @@ void RuntimeStateMachine::handleAPMode() {
 }
 
 void RuntimeStateMachine::handleWiFiConnecting() {
-  Serial.println("[RSM] WIFI_CONNECTING: WiFi connection will be implemented in T3.2+");
-  // WiFi connection implementation will be added in T3.2
-  // For now, transition to error for testing
-  transitionTo(RuntimeState::ERROR);
+  Serial.println("[RSM] WIFI_CONNECTING: Initiating WiFi connection");
+  
+  if (wifiManager->isConnected()) {
+    Serial.println("[RSM] WiFi already connected");
+    transitionTo(RuntimeState::WIFI_CONNECTED);
+    return;
+  }
+  
+  if (cachedSSID.isEmpty()) {
+    Serial.println("[RSM] No WiFi credentials cached, cannot connect");
+    transitionTo(RuntimeState::AP_MODE);
+    return;
+  }
+  
+  // Start WiFi connection
+  if (wifiManager->connect(cachedSSID, cachedPassword)) {
+    Serial.println("[RSM] WiFi connection initiated");
+    // Stay in WIFI_CONNECTING state until WiFiManager reports connected or failed
+  } else {
+    Serial.println("[RSM] WiFi connection failed to initiate");
+    transitionTo(RuntimeState::ERROR);
+  }
+  
+  // Check WiFi state and transition accordingly
+  if (wifiManager->getState() == WiFiState::CONNECTED) {
+    transitionTo(RuntimeState::WIFI_CONNECTED);
+  } else if (wifiManager->getState() == WiFiState::CONNECTION_FAILED) {
+    Serial.println("[RSM] WiFi connection failed, entering AP mode");
+    transitionTo(RuntimeState::AP_MODE);
+  }
 }
 
 void RuntimeStateMachine::handleWiFiConnected() {
   Serial.println("[RSM] WIFI_CONNECTED: WiFi connected, proceeding to backend connection");
+  
+  // Verify WiFi is still connected
+  if (!wifiManager->isConnected()) {
+    Serial.println("[RSM] WiFi disconnected, retrying");
+    transitionTo(RuntimeState::WIFI_CONNECTING);
+    return;
+  }
+  
   transitionTo(RuntimeState::BACKEND_CONNECTING);
 }
 
 void RuntimeStateMachine::handleBackendConnecting() {
-  Serial.println("[RSM] BACKEND_CONNECTING: Backend connection will be implemented in T3.2+");
-  // Backend connection implementation will be added in T3.2
-  // For now, transition to error for testing
-  transitionTo(RuntimeState::ERROR);
+  Serial.println("[RSM] BACKEND_CONNECTING: Initiating backend connection");
+  
+  if (backendManager->isConnected()) {
+    Serial.println("[RSM] Backend already connected");
+    transitionTo(RuntimeState::REGISTERING);
+    return;
+  }
+  
+  if (cachedBackendHost.isEmpty()) {
+    Serial.println("[RSM] No backend details cached, cannot connect");
+    transitionTo(RuntimeState::ERROR);
+    return;
+  }
+  
+  // Start backend connection
+  if (backendManager->connect(cachedBackendHost, cachedBackendPort, cachedBackendPath)) {
+    Serial.println("[RSM] Backend connection initiated");
+    // Stay in BACKEND_CONNECTING state until BackendManager reports connected or failed
+  } else {
+    Serial.println("[RSM] Backend connection failed to initiate");
+    transitionTo(RuntimeState::ERROR);
+  }
+  
+  // Check backend state and transition accordingly
+  if (backendManager->getState() == BackendState::CONNECTED) {
+    Serial.println("[RSM] Backend connected, proceeding to registration");
+    transitionTo(RuntimeState::REGISTERING);
+  } else if (backendManager->getState() == BackendState::CONNECTION_FAILED) {
+    Serial.println("[RSM] Backend connection failed, entering error state");
+    transitionTo(RuntimeState::ERROR);
+  }
 }
 
 void RuntimeStateMachine::handleRegistering() {
-  Serial.println("[RSM] REGISTERING: Registration will be implemented in T3.3");
-  // Registration implementation will be added in T3.3
-  // For now, transition to error for testing
-  transitionTo(RuntimeState::ERROR);
+  Serial.println("[RSM] REGISTERING: Registration will be implemented in T3.4");
+  // Registration implementation will be added in T3.4
+  // For now, stay in REGISTERING state to show backend connectivity is working
+  DeviceStateManager::setStatus("REGISTERING");
+  // Do not transition - this phase only tests connectivity
 }
 
 void RuntimeStateMachine::handleReady() {
