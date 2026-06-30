@@ -2,6 +2,7 @@
 #define SCREEN_MANAGER_H
 
 #include <Arduino.h>
+#include <type_traits>
 #include "DisplayManager.h"
 #include "Screen.h"
 #include "DeviceState.h"
@@ -29,7 +30,21 @@ public:
   
   // Screen Transitions
   template<typename T>
-  void transitionTo();
+  void transitionTo() {
+    if (std::is_same<T, SplashScreen>::value) {
+      switchScreen(splashScreen);
+    } else if (std::is_same<T, SetupScreen>::value) {
+      switchScreen(setupScreen);
+    } else if (std::is_same<T, ConnectingScreen>::value) {
+      switchScreen(connectingScreen);
+    } else if (std::is_same<T, RegisteringScreen>::value) {
+      switchScreen(registeringScreen);
+    } else if (std::is_same<T, MiningScreen>::value) {
+      switchScreen(miningScreen);
+    } else if (std::is_same<T, ErrorScreen>::value) {
+      switchScreen(errorScreen);
+    }
+  }
   
   // Get current screen
   Screen* getCurrentScreen();

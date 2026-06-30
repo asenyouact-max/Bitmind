@@ -113,23 +113,6 @@ void ScreenManager::render() {
   }
 }
 
-template<typename T>
-void ScreenManager::transitionTo() {
-  if (std::is_same<T, SplashScreen>::value) {
-    switchScreen(splashScreen);
-  } else if (std::is_same<T, SetupScreen>::value) {
-    switchScreen(setupScreen);
-  } else if (std::is_same<T, ConnectingScreen>::value) {
-    switchScreen(connectingScreen);
-  } else if (std::is_same<T, RegisteringScreen>::value) {
-    switchScreen(registeringScreen);
-  } else if (std::is_same<T, MiningScreen>::value) {
-    switchScreen(miningScreen);
-  } else if (std::is_same<T, ErrorScreen>::value) {
-    switchScreen(errorScreen);
-  }
-}
-
 Screen* ScreenManager::getCurrentScreen() {
   return currentScreen;
 }
