@@ -20,8 +20,8 @@ bool DisplayManager::begin() {
   // Initialize TFT_eSPI (identical to hardware_test)
   display.begin();
   
-  // Set rotation to landscape (identical to hardware_test)
-  display.setRotation(1);
+  // Set rotation to landscape (ILI9341_2_DRIVER requires rotation 3 for CYD)
+  display.setRotation(3);
   
   // Fill screen with background color (identical to hardware_test)
   display.fillScreen(backgroundColor);
