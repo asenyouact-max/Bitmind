@@ -123,7 +123,7 @@ void loop() {
   }
   
   if (screenManager) {
-    screenManager->update();
+    // Skip update() in validation mode to prevent normal state machine from overriding validation transitions
     screenManager->render();
   }
   delay(100);
