@@ -11,6 +11,7 @@
  */
 
 #include <Arduino.h>
+#include <TFT_eSPI.h>
 #include "display/DisplayManager.h"
 #include "display/ScreenManager.h"
 
@@ -24,6 +25,9 @@
 // ============================================================================
 // GLOBAL OBJECTS
 // ============================================================================
+
+// Phase T2.5 Fix: TFT_eSPI as global object to match hardware_test construction timing
+TFT_eSPI tft = TFT_eSPI();
 
 DisplayManager* displayManager = nullptr;
 ScreenManager* screenManager = nullptr;
@@ -44,9 +48,9 @@ void setup() {
   Serial.printf("Device Type: %s\n", DEVICE_TYPE);
   Serial.println();
   
-  // Initialize DisplayManager
+  // Initialize DisplayManager with global TFT_eSPI reference
   Serial.println("[MAIN] Initializing DisplayManager...");
-  displayManager = new DisplayManager();
+  displayManager = new DisplayManager(tft);
   Serial.printf("[MAIN] DisplayManager created at %p\n", displayManager);
   
   if (displayManager->begin()) {

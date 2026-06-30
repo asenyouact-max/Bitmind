@@ -14,25 +14,14 @@ void ConnectingScreen::render() {
   Serial.println("[DEBUG] ConnectingScreen::render: start");
   const DeviceState& state = DeviceStateManager::getState();
   
-  Serial.println("[DEBUG] ConnectingScreen::render: PHASE T2.5 - Minimal render test identical to hardware_test");
+  Serial.println("[DEBUG] ConnectingScreen::render: calling fillScreen");
+  display->fillScreen(TFT_BG_COLOR);
   
-  // Exact sequence from hardware_test (bypass DisplayManager helpers)
-  Serial.println("[DEBUG] Step 1: fillScreen(TFT_BLACK)");
-  display->getDisplay().fillScreen(TFT_BLACK);
-  
-  Serial.println("[DEBUG] Step 2: setTextColor(TFT_WHITE, TFT_BLACK)");
-  display->getDisplay().setTextColor(TFT_WHITE, TFT_BLACK);
-  
-  Serial.println("[DEBUG] Step 3: setTextSize(2)");
-  display->getDisplay().setTextSize(2);
-  
-  Serial.println("[DEBUG] Step 4: setCursor(20, 20)");
-  display->getDisplay().setCursor(20, 20);
-  
-  Serial.println("[DEBUG] Step 5: print(\"HELLO TFT\")");
-  display->getDisplay().print("HELLO TFT");
-  
-  Serial.println("[DEBUG] Minimal render test completed successfully");
+  // Header - CONNECTING (centered, size 3, white)
+  Serial.println("[DEBUG] ConnectingScreen::render: setting foreground color to white");
+  display->setForegroundColor(TFT_FG_COLOR);
+  Serial.println("[DEBUG] ConnectingScreen::render: calling drawTextCentered for CONNECTING");
+  display->drawTextCentered(20, "CONNECTING", 3);
   
   // Separator line
   Serial.println("[DEBUG] ConnectingScreen::render: setting foreground color to gray");

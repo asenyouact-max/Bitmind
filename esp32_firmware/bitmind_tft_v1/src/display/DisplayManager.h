@@ -21,7 +21,7 @@
 
 class DisplayManager {
 public:
-  DisplayManager();
+  DisplayManager(TFT_eSPI& tft);
   ~DisplayManager();
   
   // Initialization
@@ -58,7 +58,7 @@ public:
   void fillScreen(uint16_t color);
   
 private:
-  TFT_eSPI display;
+  TFT_eSPI& display;  // Reference to global TFT_eSPI object (Phase T2.5 fix)
   bool initialized;
   uint16_t foregroundColor;
   uint16_t backgroundColor;

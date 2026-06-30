@@ -1,7 +1,7 @@
 #include "DisplayManager.h"
 
-DisplayManager::DisplayManager() 
-  : display(),
+DisplayManager::DisplayManager(TFT_eSPI& tft) 
+  : display(tft),
     initialized(false),
     foregroundColor(TFT_FG_COLOR),
     backgroundColor(TFT_BG_COLOR),
