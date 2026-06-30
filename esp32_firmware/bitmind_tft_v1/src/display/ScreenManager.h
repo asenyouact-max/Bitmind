@@ -6,14 +6,12 @@
 #include "DisplayManager.h"
 #include "Screen.h"
 #include "DeviceState.h"
-
-// Forward declarations of screen classes
-class SplashScreen;
-class SetupScreen;
-class ConnectingScreen;
-class RegisteringScreen;
-class MiningScreen;
-class ErrorScreen;
+#include "screens/SplashScreen.h"
+#include "screens/SetupScreen.h"
+#include "screens/ConnectingScreen.h"
+#include "screens/RegisteringScreen.h"
+#include "screens/MiningScreen.h"
+#include "screens/ErrorScreen.h"
 
 class ScreenManager {
 public:
