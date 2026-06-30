@@ -6,14 +6,25 @@
 
 // Configuration structure
 struct Config {
+  // Network
   String ssid;
   String password;
+  
+  // Device Identity
   String workerName;
   String walletAddress;
+  
+  // Backend Configuration
+  String backendHost;
+  uint16_t backendPort;
+  String backendPath;
+  String backendProtocol;
+  
+  // Authentication
   bool registered;
   String token;
   
-  Config() : registered(false) {}
+  Config() : registered(false), backendPort(8080), backendProtocol("ws") {}
 };
 
 class ConfigManager {

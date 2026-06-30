@@ -228,3 +228,14 @@ void BackendManager::webSocketEvent(WStype_t type, uint8_t* payload, size_t leng
     instance->onWSEvent(type, payload, length);
   }
 }
+
+bool BackendManager::sendMessage(const String& message) {
+  if (!isConnected()) {
+    Serial.println("[BACKEND] Cannot send message: not connected");
+    return false;
+  }
+  
+  Serial.println("[BACKEND] Sending message: " + message);
+  webSocket.sendTXT(message);
+  return true;
+}

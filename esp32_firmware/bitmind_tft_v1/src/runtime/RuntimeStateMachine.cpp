@@ -8,15 +8,18 @@ RuntimeStateMachine::RuntimeStateMachine()
     previousState(RuntimeState::BOOT),
     wifiManager(nullptr),
     backendManager(nullptr),
+    registrationManager(nullptr),
     cachedBackendPort(0) {
   
   wifiManager = new WiFiManager();
   backendManager = new BackendManager();
+  registrationManager = new RegistrationManager();
 }
 
 RuntimeStateMachine::~RuntimeStateMachine() {
   delete wifiManager;
   delete backendManager;
+  delete registrationManager;
 }
 
 void RuntimeStateMachine::begin() {
@@ -27,6 +30,10 @@ void RuntimeStateMachine::begin() {
   // Initialize managers
   wifiManager->begin();
   backendManager->begin();
+  registrationManager->begin();
+  
+  // Wire RegistrationManager to BackendManager
+  registrationManager->setBackendManager(backendManager);
   
   Serial.println("[RSM] Initial state: BOOT");
 }
@@ -38,6 +45,9 @@ void RuntimeStateMachine::update() {
   }
   if (backendManager) {
     backendManager->update();
+  }
+  if (registrationManager) {
+    registrationManager->update();
   }
   
   handleState();
@@ -136,10 +146,12 @@ void RuntimeStateMachine::handleCheckConfig() {
     cachedSSID = config.ssid;
     cachedPassword = config.password;
     
-    // Backend connection details (hardcoded for T3.3, will be configurable later)
-    cachedBackendHost = "backend.bitmind.io";
-    cachedBackendPort = 8080;
-    cachedBackendPath = "/ws";
+    // Backend connection details from ConfigManager
+    cachedBackendHost = config.backendHost;
+    cachedBackendPort = config.backendPort;
+    cachedBackendPath = config.backendPath;
+    
+    Serial.println("[RSM] Backend: " + config.backendProtocol + "://" + cachedBackendHost + ":" + String(cachedBackendPort) + cachedBackendPath);
     
     transitionTo(RuntimeState::WIFI_CONNECTING);
   } else {
@@ -239,11 +251,52 @@ void RuntimeStateMachine::handleBackendConnecting() {
 }
 
 void RuntimeStateMachine::handleRegistering() {
-  Serial.println("[RSM] REGISTERING: Registration will be implemented in T3.4");
-  // Registration implementation will be added in T3.4
-  // For now, stay in REGISTERING state to show backend connectivity is working
-  DeviceStateManager::setStatus("REGISTERING");
-  // Do not transition - this phase only tests connectivity
+  Serial.println("[RSM] REGISTERING: Starting device registration");
+  
+  // Check if already registered
+  ConfigManager configManager;
+  if (configManager.isRegistered()) {
+    Serial.println("[RSM] Device already registered, proceeding to READY");
+    transitionTo(RuntimeState::READY);
+    return;
+  }
+  
+  // Check if RegistrationManager is already in progress
+  if (registrationManager->getState() == RegistrationState::REGISTERING) {
+    Serial.println("[RSM] Registration in progress, waiting for response");
+    // Stay in REGISTERING state
+    return;
+  }
+  
+  // Check if registration succeeded
+  if (registrationManager->getState() == RegistrationState::REGISTERED) {
+    Serial.println("[RSM] Registration successful, proceeding to READY");
+    transitionTo(RuntimeState::READY);
+    return;
+  }
+  
+  // Check if registration failed
+  if (registrationManager->getState() == RegistrationState::FAILED) {
+    Serial.println("[RSM] Registration failed, entering ERROR state");
+    transitionTo(RuntimeState::ERROR);
+    return;
+  }
+  
+  // Start registration
+  String deviceId = DeviceIdentity::getDeviceId();
+  Config config;
+  if (configManager.loadConfiguration(config)) {
+    if (registrationManager->startRegistration(deviceId, config.workerName, config.walletAddress)) {
+      Serial.println("[RSM] Registration started");
+      // Stay in REGISTERING state
+    } else {
+      Serial.println("[RSM] Failed to start registration");
+      transitionTo(RuntimeState::ERROR);
+    }
+  } else {
+    Serial.println("[RSM] Failed to load configuration for registration");
+    transitionTo(RuntimeState::ERROR);
+  }
 }
 
 void RuntimeStateMachine::handleReady() {

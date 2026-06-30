@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include "WiFiManager.h"
 #include "BackendManager.h"
+#include "RegistrationManager.h"
 
 // Runtime states
 enum class RuntimeState {
@@ -47,6 +48,7 @@ private:
   // Runtime managers
   WiFiManager* wifiManager;
   BackendManager* backendManager;
+  RegistrationManager* registrationManager;
   
   // Configuration cache
   String cachedSSID;

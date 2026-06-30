@@ -27,6 +27,13 @@ bool ConfigManager::loadConfiguration(Config& config) {
   config.password = getString("pass", "");
   config.workerName = getString("worker", "");
   config.walletAddress = getString("wallet", "");
+  
+  // Backend configuration
+  config.backendHost = getString("backendHost", "backend.bitmind.io");
+  config.backendPort = preferences.getUInt("backendPort", 8080);
+  config.backendPath = getString("backendPath", "/ws");
+  config.backendProtocol = getString("backendProtocol", "ws");
+  
   config.registered = getBool("registered", false);
   config.token = getString("token", "");
   
@@ -35,6 +42,7 @@ bool ConfigManager::loadConfiguration(Config& config) {
   Serial.println("[CONFIG] Configuration loaded");
   Serial.println("[CONFIG] SSID: " + (config.ssid.isEmpty() ? "(empty)" : config.ssid));
   Serial.println("[CONFIG] Worker: " + (config.workerName.isEmpty() ? "(empty)" : config.workerName));
+  Serial.println("[CONFIG] Backend: " + config.backendProtocol + "://" + config.backendHost + ":" + String(config.backendPort) + config.backendPath);
   Serial.println("[CONFIG] Registered: " + String(config.registered ? "Yes" : "No"));
   
   return true;
@@ -50,6 +58,13 @@ bool ConfigManager::saveConfiguration(const Config& config) {
   putString("pass", config.password);
   putString("worker", config.workerName);
   putString("wallet", config.walletAddress);
+  
+  // Backend configuration
+  putString("backendHost", config.backendHost);
+  preferences.putUInt("backendPort", config.backendPort);
+  putString("backendPath", config.backendPath);
+  putString("backendProtocol", config.backendProtocol);
+  
   putBool("registered", config.registered);
   putString("token", config.token);
   
@@ -58,6 +73,7 @@ bool ConfigManager::saveConfiguration(const Config& config) {
   Serial.println("[CONFIG] Configuration saved");
   Serial.println("[CONFIG] SSID: " + (config.ssid.isEmpty() ? "(empty)" : config.ssid));
   Serial.println("[CONFIG] Worker: " + (config.workerName.isEmpty() ? "(empty)" : config.workerName));
+  Serial.println("[CONFIG] Backend: " + config.backendProtocol + "://" + config.backendHost + ":" + String(config.backendPort) + config.backendPath);
   Serial.println("[CONFIG] Registered: " + String(config.registered ? "Yes" : "No"));
   
   return true;
