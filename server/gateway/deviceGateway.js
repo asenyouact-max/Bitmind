@@ -83,10 +83,10 @@ function mapSystemState() {
 function createRegistrationResponse(deviceId, token) {
   return {
     type: 'device.registered',
-    status: 'accepted',
+    success: true,
     deviceId: deviceId,
     token: token,
-    serverTime: Math.floor(Date.now() / 1000)
+    timestamp: Date.now()
   };
 }
 

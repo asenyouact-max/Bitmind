@@ -143,9 +143,26 @@ const handlers = {
   // Device registration handler with RegistrationStore integration
   // Phase D: Uses deviceGateway for protocol-compliant validation and messages
   // Phase F5-P1: Uses RegistrationStore for persistent device identity
+  // Phase T3.4: Firmware registration support with wallet validation
   register: async (ws, data) => {
     const deviceId = data.deviceId;
     const ipAddress = ws._socket.remoteAddress;
+
+    // Validate required fields for firmware registration
+    if (!deviceId || !data.workerName || !data.walletAddress) {
+      console.log("[WS] REGISTER_FAILED deviceId=" + (deviceId || 'null') + " reason=MISSING_REQUIRED_FIELDS");
+      const errorMsg = deviceGateway.createDeviceError('PAYLOAD_INVALID', 'Missing required fields: deviceId, workerName, walletAddress');
+      ws.send(JSON.stringify(errorMsg));
+      return false;
+    }
+
+    // Validate wallet address format (basic prefix check for firmware compatibility)
+    if (data.walletAddress && !data.walletAddress.startsWith('bc1') && !data.walletAddress.startsWith('1') && !data.walletAddress.startsWith('3')) {
+      console.log("[WS] REGISTER_FAILED deviceId=" + deviceId + " reason=INVALID_WALLET_ADDRESS");
+      const errorMsg = deviceGateway.createDeviceError('PAYLOAD_INVALID', 'Invalid wallet address format');
+      ws.send(JSON.stringify(errorMsg));
+      return false;
+    }
 
     // Phase D: Validate registration using deviceGateway
     const validation = deviceGateway.validateRegistration(data);
