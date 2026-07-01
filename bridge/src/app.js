@@ -2,6 +2,7 @@ const express = require('express');
 const DeviceManager = require('./devices/deviceManager');
 const { initialize: initializeWebSocket } = require('./ws/miningSocket');
 const { initialize: initializeEventStore, shutdown: shutdownEventStore } = require('./core/eventStore');
+const { initialize: initializeTokenManager, shutdown: shutdownTokenManager } = require('./auth/tokenManager');
 
 // Import routes
 const statusRoutes = require('./routes/status');
@@ -148,6 +149,9 @@ async function initializeSystem() {
     console.log('[App] Initializing event store...');
     await initializeEventStore();
     
+    console.log('[App] Initializing token manager...');
+    initializeTokenManager();
+    
     console.log('[App] Initializing monitoring system...');
     // Monitoring system is self-initializing, just log that it's ready
     
@@ -186,6 +190,14 @@ async function gracefulShutdown() {
     console.log('[App] Event store shutdown complete');
   } catch (error) {
     console.error('[App] Error during shutdown:', error.message);
+  }
+  
+  try {
+    // Shutdown token manager
+    shutdownTokenManager();
+    console.log('[App] Token manager shutdown complete');
+  } catch (error) {
+    console.error('[App] Error during token manager shutdown:', error.message);
   }
   
   process.exit(0);

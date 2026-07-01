@@ -1,6 +1,7 @@
 const WebSocket = require('ws');
 const { storeEvent } = require('../core/eventStore');
 const { increment } = require('../monitoring/metricsEngine');
+const { generateToken, storeToken, validateToken, isDeviceRegistered, getDeviceToken } = require('../auth/tokenManager');
 
 let wss = null;
 let clients = new Set();
@@ -37,7 +38,7 @@ function canBroadcast(jobId) {
 function initialize(server) {
   wss = new WebSocket.Server({ 
     server,
-    path: '/ws/mining'
+    path: '/ws'
   });
 
   wss.on('connection', handleConnection);
@@ -48,7 +49,7 @@ function initialize(server) {
   // Initialize job cache
   initializeJobCache();
   
-  console.log('[MiningSocket] WebSocket server initialized on /ws/mining');
+  console.log('[MiningSocket] WebSocket server initialized on /ws');
 }
 
 /**
@@ -195,8 +196,93 @@ function handleMessage(ws, message) {
       });
       break;
       
+    case 'device.register':
+      handleDeviceRegister(ws, message);
+      break;
+      
     default:
       console.log(`[MiningSocket] Unknown message type [${message.type}] from client [${ws.clientId}]`);
+  }
+}
+
+/**
+ * Handle device registration
+ * @param {WebSocket} ws - WebSocket connection
+ * @param {Object} message - Registration message
+ */
+function handleDeviceRegister(ws, message) {
+  const { deviceId, workerName, walletAddress } = message;
+
+  console.log(`[MiningSocket] Device registration request from [${ws.clientId}]: ${deviceId}`);
+
+  // Validate required fields
+  if (!deviceId || !workerName || !walletAddress) {
+    console.log('[MiningSocket] Registration failed: missing required fields');
+    sendToClient(ws, {
+      type: 'error',
+      error: 'Missing required fields: deviceId, workerName, walletAddress',
+      timestamp: Date.now()
+    });
+    return;
+  }
+
+  // Validate wallet address format (basic validation)
+  if (!walletAddress.startsWith('bc1') && !walletAddress.startsWith('1') && !walletAddress.startsWith('3')) {
+    console.log('[MiningSocket] Registration failed: invalid wallet address format');
+    sendToClient(ws, {
+      type: 'error',
+      error: 'Invalid wallet address format',
+      timestamp: Date.now()
+    });
+    return;
+  }
+
+  // Check if device already registered
+  if (isDeviceRegistered(deviceId)) {
+    console.log(`[MiningSocket] Device already registered: ${deviceId}`);
+    const existingToken = getDeviceToken(deviceId);
+    
+    if (existingToken) {
+      sendToClient(ws, {
+        type: 'device.registered',
+        success: true,
+        deviceId: deviceId,
+        token: existingToken,
+        timestamp: Date.now()
+      });
+      return;
+    }
+  }
+
+  // Generate new token
+  const token = generateToken();
+
+  // Store token in database
+  if (storeToken(deviceId, token, workerName, walletAddress)) {
+    console.log(`[MiningSocket] Device registered successfully: ${deviceId}`);
+    
+    // Log registration event
+    storeEvent('device_registered', {
+      client_id: ws.clientId,
+      device_id: deviceId,
+      worker_name: workerName,
+      wallet_address: walletAddress
+    });
+
+    sendToClient(ws, {
+      type: 'device.registered',
+      success: true,
+      deviceId: deviceId,
+      token: token,
+      timestamp: Date.now()
+    });
+  } else {
+    console.log('[MiningSocket] Registration failed: token storage error');
+    sendToClient(ws, {
+      type: 'error',
+      error: 'Failed to store token',
+      timestamp: Date.now()
+    });
   }
 }
 
