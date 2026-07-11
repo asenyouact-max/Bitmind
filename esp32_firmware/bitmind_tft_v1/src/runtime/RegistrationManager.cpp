@@ -164,7 +164,8 @@ void RegistrationManager::sendRegistrationRequest() {
   payload += "\"type\":\"device.register\",";
   payload += "\"deviceId\":\"" + currentDeviceId + "\",";
   payload += "\"workerName\":\"" + currentWorkerName + "\",";
-  payload += "\"walletAddress\":\"" + currentWalletAddress + "\"";
+  payload += "\"walletAddress\":\"" + currentWalletAddress + "\",";
+  payload += "\"deviceType\":\"miner\"";
   payload += "}";
   
   Serial.println("[REG] Sending registration request: " + payload);
