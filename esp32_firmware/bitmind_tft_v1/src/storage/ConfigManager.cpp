@@ -39,6 +39,25 @@ bool ConfigManager::loadConfiguration(Config& config) {
   
   end();
   
+  // One-time migration of legacy placeholder backend configuration to canonical endpoint
+  if (config.backendHost == "localhost" && 
+      config.backendPort == 8080 && 
+      config.backendProtocol == "http" && 
+      config.backendPath == "/api") {
+    Serial.println("[CONFIG] Detected legacy placeholder backend configuration, migrating to canonical endpoint");
+    config.backendHost = "getbitmind.com";
+    config.backendPort = 443;
+    config.backendProtocol = "wss";
+    config.backendPath = "/ws";
+    
+    // Persist migrated configuration
+    if (saveConfiguration(config)) {
+      Serial.println("[CONFIG] Legacy backend configuration successfully migrated");
+    } else {
+      Serial.println("[CONFIG] WARNING: Failed to persist migrated backend configuration");
+    }
+  }
+  
   Serial.println("[CONFIG] Configuration loaded");
   Serial.println("[CONFIG] SSID: " + (config.ssid.isEmpty() ? "(empty)" : config.ssid));
   Serial.println("[CONFIG] Worker: " + (config.workerName.isEmpty() ? "(empty)" : config.workerName));

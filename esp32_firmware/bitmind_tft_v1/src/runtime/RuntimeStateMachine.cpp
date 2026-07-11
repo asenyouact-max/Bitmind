@@ -336,6 +336,14 @@ void RuntimeStateMachine::handleBackendConnecting() {
     return;
   }
   
+  // Guard against calling connect() when BackendManager already owns the connection lifecycle
+  if (backendManager->getState() == BackendState::CONNECTING || 
+      backendManager->getState() == BackendState::RECONNECTING) {
+    Serial.println("[RSM] Backend already connecting/reconnecting, waiting for result");
+    // Stay in BACKEND_CONNECTING state, observe BackendManager state transitions
+    return;
+  }
+  
   if (cachedBackendHost.isEmpty()) {
     Serial.println("[RSM] No backend details cached, cannot connect");
     transitionTo(RuntimeState::ERROR);
