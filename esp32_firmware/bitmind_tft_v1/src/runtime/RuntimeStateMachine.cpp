@@ -394,6 +394,7 @@ void RuntimeStateMachine::handleRegistering() {
   ConfigManager configManager;
   if (configManager.isRegistered()) {
     Serial.println("[RSM] Device already registered, proceeding to READY");
+    DeviceStateManager::setRegistered(true);
     transitionTo(RuntimeState::READY);
     return;
   }
