@@ -1,5 +1,5 @@
 # BITMIND CANONICAL STATE v1
-Last Updated: 2026-06-30
+Last Updated: 2026-07-01
 Status: ACTIVE
 Authority: This document is the single source of truth for Bitmind.
 
@@ -843,8 +843,67 @@ TFT TRACK
 - Screen Architecture: COMPLETE
 - Validation: COMPLETE
 
+------------------------------------------------------------------------------
+
+**Phase T3 - Runtime Features Implementation:**
+- Status: COMPLETE
+- Date: 2026-07-01
+- Commit: Multiple commits (T3.1-T3.4)
+
+**Achievements:**
+- DeviceIdentity implemented (EFuse MAC-based deviceId generation)
+- ConfigManager implemented (NV storage for WiFi, backend, worker, wallet, registration, token)
+- RuntimeStateMachine implemented (orchestration of WiFi, backend, registration flow)
+- WiFiManager implemented (WiFi transport, AP mode, provisioning)
+- BackendManager implemented (WebSocket transport, connection management)
+- RegistrationManager implemented (registration protocol, device.register handling)
+- DeviceStateManager implemented (Single Source of Truth for runtime state)
+- ScreenManager integrated with runtime state
+- DisplayManager integrated with runtime state
+- Complete runtime flow: BOOT → CHECK_CONFIG → AP_MODE → WIFI_CONNECTING → WIFI_CONNECTED → BACKEND_CONNECTING → REGISTERING → READY → MINING
+- Error recovery and state transitions implemented
+- Factory reset functionality implemented
+
+**Scope Compliance:**
+- Runtime features only (no display changes)
+- No backend protocol changes
+- No mining protocol changes
+- Device architecture follows canonical ownership model
+- State management follows Single Source of Truth principle
+
+**Architecture:**
+- **Persistent Layer:** DeviceIdentity (hardware identity), ConfigManager (all persistent configuration)
+- **Runtime Layer:** RuntimeStateMachine (orchestration), WiFiManager (WiFi transport), BackendManager (WebSocket transport), RegistrationManager (registration protocol)
+- **State:** DeviceStateManager (Single Source of Truth)
+- **Presentation:** ScreenManager (presentation), DisplayManager (rendering)
+- **Unchanged:** Backend protocol, mining protocol, device protocol, all business logic
+
+**Files Added:**
+- esp32_firmware/bitmind_tft_v1/src/identity/DeviceIdentity.h
+- esp32_firmware/bitmind_tft_v1/src/identity/DeviceIdentity.cpp
+- esp32_firmware/bitmind_tft_v1/src/storage/ConfigManager.h
+- esp32_firmware/bitmind_tft_v1/src/storage/ConfigManager.cpp
+- esp32_firmware/bitmind_tft_v1/src/runtime/RuntimeStateMachine.h
+- esp32_firmware/bitmind_tft_v1/src/runtime/RuntimeStateMachine.cpp
+- esp32_firmware/bitmind_tft_v1/src/runtime/WiFiManager.h
+- esp32_firmware/bitmind_tft_v1/src/runtime/WiFiManager.cpp
+- esp32_firmware/bitmind_tft_v1/src/runtime/BackendManager.h
+- esp32_firmware/bitmind_tft_v1/src/runtime/BackendManager.cpp
+- esp32_firmware/bitmind_tft_v1/src/runtime/RegistrationManager.h
+- esp32_firmware/bitmind_tft_v1/src/runtime/RegistrationManager.cpp
+
+**TFT Runtime Status:**
+- Device Identity: COMPLETE
+- Configuration Management: COMPLETE
+- WiFi Management: COMPLETE
+- Backend Management: COMPLETE
+- Registration Management: COMPLETE
+- State Management: COMPLETE
+- Runtime Orchestration: COMPLETE
+- Error Recovery: COMPLETE
+
 **Ready For Next Phase:**
-- Phase T3 - Runtime Features (AP Mode, Captive Portal, WiFi Provisioning, QR Code, Connect Miner, Device Registration, Backend Runtime, Mining Runtime, Runtime State Machine, Error Recovery)
+- Phase T4 - Touch Interaction (Touch events, gesture handling, interactive screens)
 
 ==============================================================================
 KNOWN COMPLETED FEATURES
@@ -1004,6 +1063,106 @@ Validation:
 No token lifecycle changes without updating BITMIND_F5_IDENTITY_ARCHITECTURE_DESIGN.md first.
 
 ==============================================================================
+DEVICE REGISTRATION LIFECYCLE
+==============================================================================
+
+STATUS: FINAL
+
+Purpose:
+
+Document verified device registration lifecycle behavior for TFT firmware
+
+Registration Payload Schema:
+
+Firmware sends device.register with required fields:
+{
+  "type": "device.register",
+  "deviceId": "esp32-xxxx",
+  "workerName": "...",
+  "walletAddress": "...",
+  "deviceType": "miner",
+  "firmwareVersion": "1.0"
+}
+
+Backend responds with device.registered:
+{
+  "type": "device.registered",
+  "success": true,
+  "deviceId": "...",
+  "token": "..."
+}
+
+1. Fresh Device Registration Flow
+
+BOOT
+→ CHECK_CONFIG
+→ WIFI_CONNECTING
+→ WIFI_CONNECTED
+→ BACKEND_CONNECTING
+→ REGISTERING
+
+RuntimeStateMachine::handleRegistering():
+- Detects configManager.isRegistered() == false
+- Calls RegistrationManager::startRegistration()
+- RegistrationManager sends device.register payload
+- Backend validates payload (deviceId, workerName, walletAddress, deviceType, firmwareVersion)
+- Backend generates token (32-byte hex)
+- Backend responds with device.registered
+- RegistrationManager::parseRegistrationResponse() stores token
+- RegistrationManager::setState(REGISTERED)
+- RegistrationManager::updateDeviceStateManager() calls setRegistered(true)
+- RuntimeStateMachine transitions to READY
+- RuntimeStateMachine transitions to MINING
+- ScreenManager sees registered=true, miningActive=true → MiningScreen
+
+2. Token-Based Reconnect Flow
+
+After reboot with persisted token:
+
+BOOT
+→ CHECK_CONFIG
+
+ConfigManager detects:
+- Registered: Yes
+- Stored token available
+
+RuntimeStateMachine::handleRegistering():
+- Detects configManager.isRegistered() == true
+- Skips first-time registration
+- Calls DeviceStateManager::setRegistered(true) [T4.2.14 fix]
+- Transitions to READY
+- Transitions to MINING
+- ScreenManager sees registered=true, miningActive=true → MiningScreen
+
+3. T4.2.14 Fix
+
+Issue:
+- Token-based reboot did not call DeviceStateManager::setRegistered(true)
+- ScreenManager saw registered=false and stayed on RegisteringScreen
+- Even though RuntimeState transitioned to READY → MINING
+
+Fix:
+- Added DeviceStateManager::setRegistered(true) in handleRegistering()
+- Called before transitioning to READY when existing registration detected
+- Ensures DeviceState.registered is set for screen transition logic
+
+4. Verification Status
+
+Fresh Registration:
+✓ Backend accepted device.register payload
+✓ Token generated and stored
+✓ Device reached MiningScreen
+
+Token-Based Reboot:
+✓ Device loaded existing registration
+✓ Device skipped registration correctly
+✓ Device reached MiningScreen after T4.2.14 fix
+
+No backend protocol changes.
+No token lifecycle changes.
+This section documents verified runtime behavior only.
+
+==============================================================================
 ONBOARDING ALIGNMENT
 ==============================================================================
 
@@ -1035,6 +1194,223 @@ Backward Compatibility:
 - No protocol breaking changes
 
 No onboarding alignment changes without updating BITMIND_F5_P2_ONBOARDING_CONTRACT.md first.
+
+==============================================================================
+FIRMWARE CANONICAL OWNERSHIP
+==============================================================================
+
+STATUS: FINAL
+
+Persistent Layer:
+
+DeviceIdentity
+  • Hardware identity only (EFuse MAC-based deviceId generation)
+  • Does NOT own configuration
+  • Does NOT own authentication
+  • Does NOT own registration state
+
+ConfigManager
+  • WiFi credentials (ssid, password)
+  • Backend configuration (host, port, path, protocol)
+  • Worker name
+  • Wallet address
+  • Registration state (registered flag)
+  • Authentication token
+  • Single source of truth for persistent configuration
+
+Runtime Layer:
+
+RuntimeStateMachine
+  • Orchestration only
+  • Does NOT own configuration
+  • Does NOT own authentication
+  • Does NOT own registration persistence
+  • Does NOT own display logic
+  • Coordinates WiFiManager, BackendManager, RegistrationManager
+
+WiFiManager
+  • WiFi transport only
+  • AP mode management
+  • WiFi connection management
+  • Does NOT own configuration (reads from ConfigManager)
+
+BackendManager
+  • WebSocket transport only
+  • Connection management
+  • Message routing
+  • Does NOT own registration protocol (delegates to RegistrationManager)
+
+RegistrationManager
+  • Registration protocol implementation
+  • device.register message handling
+  • device.registered response handling
+  • Does NOT own token generation (backend RegistrationStore owns)
+  • Does NOT own token storage (backend RegistrationStore owns)
+
+State:
+
+DeviceStateManager
+  • Single Source of Truth for runtime state
+  • WiFi state, backend state, registration state, mining state, system state
+  • All runtime mutations go through DeviceStateManager
+  • No duplicate runtime state
+  • No hidden state ownership
+
+Presentation:
+
+ScreenManager
+  • Presentation only
+  • Screen routing and lifecycle
+  • Reads from DeviceStateManager
+  • Does NOT own business logic
+
+DisplayManager
+  • Rendering only
+  • Display initialization and control
+  • Does NOT own state
+  • Does NOT own business logic
+
+No ownership violations allowed.
+
+==============================================================================
+BACKEND CANONICAL OWNERSHIP
+==============================================================================
+
+STATUS: FINAL
+
+Canonical Backend:
+
+server/
+
+Production Backend:
+
+server/
+
+PM2 Process:
+
+bitmind
+
+WebSocket:
+
+Single server (server.js)
+Single routing pipeline (switch statement on message type)
+Single message dispatcher (ws/handlers.js)
+
+Registration:
+
+Single pipeline (device.register → register handler → RegistrationStore)
+Single implementation (ws/handlers.js register handler)
+No duplicate registration logic
+
+RegistrationStore:
+
+Single owner of authentication
+Token generation (crypto.randomBytes)
+Token validation
+Token persistence (SQLite)
+Registration state
+Device metadata storage
+No duplicate authentication systems
+
+SQLite:
+
+Single registration database (server/data/registrations.db)
+Single schema (registrations table)
+No duplicate persistence
+
+No duplicate backend logic allowed.
+No duplicate authentication systems allowed.
+No duplicate WebSocket servers allowed.
+
+==============================================================================
+REPOSITORY STATUS
+==============================================================================
+
+STATUS: FINAL
+
+server/:
+
+Canonical backend
+Production backend
+Single source of truth for backend implementation
+PM2 process: bitmind
+Deployed to VPS: /opt/Bitmind/server
+
+bridge/:
+
+Legacy development code
+NOT production
+NOT deployed
+NOT canonical
+Retained temporarily for historical/reference purposes only
+Contains T3.4 registration protocol development code
+No active dependencies on bridge/
+No deployment scripts reference bridge/
+Future cleanup will occur after the firmware track is complete
+
+esp32_firmware/:
+
+Production firmware
+Multiple variants (oled_v1 archived, tft_v1 active)
+Canonical firmware architecture
+DeviceIdentity, ConfigManager, RuntimeStateMachine, DeviceStateManager
+
+deployment/:
+
+Production deployment configuration
+PM2 ecosystem.config.js references server/ only
+No bridge/ references in deployment scripts
+
+==============================================================================
+ARCHITECTURAL PRINCIPLES
+==============================================================================
+
+STATUS: FINAL
+
+Canonical Principles:
+
+1. Bitmind grows by extending existing systems
+   - New functionality must EXTEND existing systems
+   - Never replace working architecture without architectural justification
+   - Preserve existing architecture whenever possible
+
+2. Never introduce duplicate subsystems
+   - No duplicate registration logic
+   - No duplicate authentication systems
+   - No duplicate WebSocket servers
+   - No duplicate backend logic
+   - No duplicate device managers
+
+3. Never create parallel architectures
+   - Single backend (server/)
+   - Single WebSocket server
+   - Single RegistrationStore
+   - Single runtime state authority
+   - Single configuration authority
+
+4. GitHub remains the Single Source of Truth
+   - All code changes committed to GitHub
+   - Production VPS receives changes ONLY from GitHub
+   - No manual hotfixes on VPS that are not committed to GitHub
+
+5. server/ remains the canonical backend
+   - All backend development occurs in server/
+   - PM2 process runs server/server.js
+   - No alternative backend deployment paths
+
+6. DeviceStateManager remains the Single Source of Truth for runtime state
+   - All runtime state mutations go through DeviceStateManager
+   - No duplicate runtime state
+   - No hidden state ownership
+
+7. RegistrationStore remains the only authentication owner
+   - Token generation
+   - Token validation
+   - Token persistence
+   - Registration state
+   - No duplicate authentication systems
+
+No architectural changes without updating BITMIND_CANONICAL_STATE.md first.
 
 ==============================================================================
 PHASE A EXCLUSIONS
