@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <WebSocketsClient.h>
+#include <functional>
 
 // Backend connection states
 enum class BackendState {
@@ -61,7 +62,7 @@ public:
   bool sendMessage(const String& message);
   
   // Generic message callback for incoming WebSocket text messages
-  typedef void (*MessageCallback)(const String& message);
+  typedef std::function<void(const String&)> MessageCallback;
   void setMessageCallback(MessageCallback callback);
   
 private:
