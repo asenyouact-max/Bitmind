@@ -22,7 +22,7 @@ public:
   void begin();
   
   // Connect to backend WebSocket server
-  bool connect(const String& host, uint16_t port, const String& path);
+  bool connect(const String& host, uint16_t port, const String& path, const String& protocol = "ws");
   
   // Disconnect from backend
   void disconnect();
@@ -60,6 +60,10 @@ public:
   // Send message to backend
   bool sendMessage(const String& message);
   
+  // Generic message callback for incoming WebSocket text messages
+  typedef void (*MessageCallback)(const String& message);
+  void setMessageCallback(MessageCallback callback);
+  
 private:
   WebSocketsClient webSocket;
   BackendState currentState;
@@ -70,6 +74,8 @@ private:
   String currentHost;
   uint16_t currentPort;
   String currentPath;
+  String currentProtocol;
+  MessageCallback messageCallback;
   
   // Internal state management
   void setState(BackendState newState);

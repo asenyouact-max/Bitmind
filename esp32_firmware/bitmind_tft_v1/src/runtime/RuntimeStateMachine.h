@@ -5,6 +5,15 @@
 #include "WiFiManager.h"
 #include "BackendManager.h"
 #include "RegistrationManager.h"
+#include "WebSetupServer.h"
+
+// Forward declaration (ScreenManager is in display layer, runtime layer depends on it)
+class ScreenManager;
+
+// AP Mode Configuration (Canonical)
+constexpr const char* AP_SSID = "Bitmind-Setup";
+constexpr const char* AP_IP = "192.168.4.1";
+constexpr const char* AP_URL = "http://192.168.4.1";
 
 // Runtime states
 enum class RuntimeState {
@@ -23,7 +32,7 @@ enum class RuntimeState {
 
 class RuntimeStateMachine {
 public:
-  RuntimeStateMachine();
+  RuntimeStateMachine(ScreenManager* screenManager);
   ~RuntimeStateMachine();
   
   // Initialize state machine
@@ -49,6 +58,8 @@ private:
   WiFiManager* wifiManager;
   BackendManager* backendManager;
   RegistrationManager* registrationManager;
+  WebSetupServer* webSetupServer;
+  ScreenManager* screenManager;
   
   // Configuration cache
   String cachedSSID;
@@ -56,6 +67,10 @@ private:
   String cachedBackendHost;
   uint16_t cachedBackendPort;
   String cachedBackendPath;
+  String cachedBackendProtocol;
+  
+  // AP mode initialization flag
+  bool apModeInitialized;
   
   // State handlers
   void handleState();
@@ -64,6 +79,7 @@ private:
   void handleBoot();
   void handleCheckConfig();
   void handleAPMode();
+  void handleAPModeEnter();
   void handleWiFiConnecting();
   void handleWiFiConnected();
   void handleBackendConnecting();
@@ -72,6 +88,9 @@ private:
   void handleMining();
   void handleError();
   void handleRecovery();
+  
+  // Onboarding callback
+  void onboardingFormCallback(const String& ssid, const String& password, const String& workerName, const String& walletAddress);
   
   // State transition
   void setState(RuntimeState newState);

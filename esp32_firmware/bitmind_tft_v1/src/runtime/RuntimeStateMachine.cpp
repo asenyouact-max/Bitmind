@@ -2,24 +2,31 @@
 #include "../storage/ConfigManager.h"
 #include "../identity/DeviceIdentity.h"
 #include "../display/DeviceState.h"
+#include "../display/ScreenManager.h"
+#include <WiFi.h>
 
-RuntimeStateMachine::RuntimeStateMachine()
+RuntimeStateMachine::RuntimeStateMachine(ScreenManager* screenManager)
   : currentState(RuntimeState::BOOT),
     previousState(RuntimeState::BOOT),
     wifiManager(nullptr),
     backendManager(nullptr),
     registrationManager(nullptr),
-    cachedBackendPort(0) {
+    webSetupServer(nullptr),
+    screenManager(screenManager),
+    cachedBackendPort(0),
+    apModeInitialized(false) {
   
   wifiManager = new WiFiManager();
   backendManager = new BackendManager();
   registrationManager = new RegistrationManager();
+  webSetupServer = new WebSetupServer();
 }
 
 RuntimeStateMachine::~RuntimeStateMachine() {
   delete wifiManager;
   delete backendManager;
   delete registrationManager;
+  delete webSetupServer;
 }
 
 void RuntimeStateMachine::begin() {
@@ -28,12 +35,36 @@ void RuntimeStateMachine::begin() {
   previousState = RuntimeState::BOOT;
   
   // Initialize managers
+  Serial.println("[RSM] Initializing WiFiManager...");
   wifiManager->begin();
+  Serial.println("[RSM] WiFiManager initialized");
+  
+  Serial.println("[RSM] Initializing BackendManager...");
   backendManager->begin();
+  Serial.println("[RSM] BackendManager initialized");
+  
+  Serial.println("[RSM] Initializing RegistrationManager...");
   registrationManager->begin();
+  Serial.println("[RSM] RegistrationManager initialized");
+  
+  Serial.println("[RSM] Initializing WebSetupServer (registering HTTP handlers)...");
+  webSetupServer->begin();
+  Serial.println("[RSM] WebSetupServer initialized (HTTP handlers registered)");
   
   // Wire RegistrationManager to BackendManager
+  Serial.println("[RSM] Wiring RegistrationManager to BackendManager...");
   registrationManager->setBackendManager(backendManager);
+  Serial.println("[RSM] RegistrationManager wired to BackendManager");
+  
+  // Wire BackendManager message callback to RegistrationManager
+  Serial.println("[RSM] Wiring BackendManager message callback to RegistrationManager...");
+  backendManager->setMessageCallback([this](const String& message) {
+    Serial.println("[RSM] BackendManager message callback invoked, forwarding to RegistrationManager");
+    if (registrationManager) {
+      registrationManager->handleRegistrationResponse(message);
+    }
+  });
+  Serial.println("[RSM] BackendManager message callback wired");
   
   Serial.println("[RSM] Initial state: BOOT");
 }
@@ -80,6 +111,13 @@ void RuntimeStateMachine::transitionTo(RuntimeState newState) {
   }
   
   Serial.println("[RSM] State transition: " + getStateName(currentState) + " -> " + getStateName(newState));
+  
+  // Reset AP mode initialization flag when leaving AP mode
+  if (currentState == RuntimeState::AP_MODE && newState != RuntimeState::AP_MODE) {
+    apModeInitialized = false;
+    Serial.println("[RSM] Reset AP mode initialization flag");
+  }
+  
   previousState = currentState;
   currentState = newState;
   updateDeviceStateManager();
@@ -150,6 +188,7 @@ void RuntimeStateMachine::handleCheckConfig() {
     cachedBackendHost = config.backendHost;
     cachedBackendPort = config.backendPort;
     cachedBackendPath = config.backendPath;
+    cachedBackendProtocol = config.backendProtocol;
     
     Serial.println("[RSM] Backend: " + config.backendProtocol + "://" + cachedBackendHost + ":" + String(cachedBackendPort) + cachedBackendPath);
     
@@ -161,41 +200,113 @@ void RuntimeStateMachine::handleCheckConfig() {
 }
 
 void RuntimeStateMachine::handleAPMode() {
-  Serial.println("[RSM] AP_MODE: Waiting for user provisioning...");
-  // AP mode implementation will be added in T3.6
-  // For now, stay in AP mode
+  // Enter AP mode initialization on first entry
+  if (!apModeInitialized) {
+    handleAPModeEnter();
+    apModeInitialized = true;
+  }
+  
+  // Runtime servicing (every loop)
+  if (webSetupServer && webSetupServer->isRunning()) {
+    webSetupServer->handleClient();
+  } else {
+    if (!webSetupServer) {
+      Serial.println("[RSM] AP_MODE: webSetupServer is null, cannot call handleClient()");
+    } else if (!webSetupServer->isRunning()) {
+      Serial.println("[RSM] AP_MODE: webSetupServer is not running, cannot call handleClient()");
+    }
+  }
+  
+  // Stay in AP mode state
   DeviceStateManager::setStatus("SETUP");
+}
+
+void RuntimeStateMachine::handleAPModeEnter() {
+  Serial.println("[RSM] AP_MODE_ENTER: Initializing AP mode...");
+  
+  // Enter AP mode using WiFi.h directly (WiFiManager doesn't have AP mode methods)
+  Serial.println("[RSM] Setting WiFi mode to WIFI_AP...");
+  WiFi.mode(WIFI_AP);
+  Serial.println("[RSM] WiFi mode set to WIFI_AP");
+  
+  Serial.print("[RSM] Starting SoftAP with SSID: ");
+  Serial.println(AP_SSID);
+  bool softAPResult = WiFi.softAP(AP_SSID);
+  Serial.print("[RSM] WiFi.softAP() return value: ");
+  Serial.println(softAPResult ? "SUCCESS" : "FAILED");
+  
+  Serial.print("[RSM] AP IP: ");
+  Serial.println(WiFi.softAPIP());
+  
+  // Update DeviceStateManager with AP mode state
   DeviceStateManager::setAPMode(true);
-  DeviceStateManager::setAPSSID("Bitmind-Setup");
-  DeviceStateManager::setAPIP("192.168.4.1");
+  DeviceStateManager::setAPSSID(AP_SSID);
+  DeviceStateManager::setAPIP(WiFi.softAPIP().toString());
+  
+  // Generate QR payload from canonical AP URL
+  String qrPayload = AP_URL;
+  Serial.print("[RSM] Generated QR payload: ");
+  Serial.println(qrPayload.c_str());
+  
+  // Store QR payload in DeviceStateManager (Single Source of Truth)
+  DeviceStateManager::setQRPayload(qrPayload);
+  
+  // Start WebSetupServer
+  if (webSetupServer) {
+    Serial.println("[RSM] Setting form callback...");
+    webSetupServer->setFormCallback([this](const String& ssid, const String& password, const String& workerName, const String& walletAddress) {
+      this->onboardingFormCallback(ssid, password, workerName, walletAddress);
+    });
+    Serial.println("[RSM] Form callback set");
+    
+    Serial.println("[RSM] Starting WebSetupServer...");
+    webSetupServer->start();
+    Serial.println("[RSM] WebSetupServer started");
+  } else {
+    Serial.println("[RSM] ERROR: webSetupServer is null");
+  }
+  
+  // Transition to SetupScreen using screenManager instance
+  if (screenManager) {
+    screenManager->transitionTo<SetupScreen>();
+    Serial.println("[RSM] Transitioned to SetupScreen");
+  } else {
+    Serial.println("[RSM] ERROR: screenManager is null");
+  }
+  
+  Serial.println("[RSM] AP mode initialization complete");
 }
 
 void RuntimeStateMachine::handleWiFiConnecting() {
-  Serial.println("[RSM] WIFI_CONNECTING: Initiating WiFi connection");
-  
+  // Check if already connected
   if (wifiManager->isConnected()) {
     Serial.println("[RSM] WiFi already connected");
     transitionTo(RuntimeState::WIFI_CONNECTED);
     return;
   }
   
+  // Check if credentials are available
   if (cachedSSID.isEmpty()) {
     Serial.println("[RSM] No WiFi credentials cached, cannot connect");
     transitionTo(RuntimeState::AP_MODE);
     return;
   }
   
-  // Start WiFi connection
-  if (wifiManager->connect(cachedSSID, cachedPassword)) {
-    Serial.println("[RSM] WiFi connection initiated");
-    // Stay in WIFI_CONNECTING state until WiFiManager reports connected or failed
-  } else {
-    Serial.println("[RSM] WiFi connection failed to initiate");
-    transitionTo(RuntimeState::ERROR);
+  // Start WiFi connection only if not already connecting
+  if (wifiManager->getState() == WiFiState::DISCONNECTED) {
+    Serial.println("[RSM] Initiating WiFi connection");
+    if (wifiManager->connect(cachedSSID, cachedPassword)) {
+      Serial.println("[RSM] WiFi connection initiated");
+    } else {
+      Serial.println("[RSM] WiFi connection failed to initiate");
+      transitionTo(RuntimeState::ERROR);
+      return;
+    }
   }
   
   // Check WiFi state and transition accordingly
   if (wifiManager->getState() == WiFiState::CONNECTED) {
+    Serial.println("[RSM] WiFi connection successful");
     transitionTo(RuntimeState::WIFI_CONNECTED);
   } else if (wifiManager->getState() == WiFiState::CONNECTION_FAILED) {
     Serial.println("[RSM] WiFi connection failed, entering AP mode");
@@ -232,7 +343,7 @@ void RuntimeStateMachine::handleBackendConnecting() {
   }
   
   // Start backend connection
-  if (backendManager->connect(cachedBackendHost, cachedBackendPort, cachedBackendPath)) {
+  if (backendManager->connect(cachedBackendHost, cachedBackendPort, cachedBackendPath, cachedBackendProtocol)) {
     Serial.println("[RSM] Backend connection initiated");
     // Stay in BACKEND_CONNECTING state until BackendManager reports connected or failed
   } else {
@@ -286,6 +397,10 @@ void RuntimeStateMachine::handleRegistering() {
   String deviceId = DeviceIdentity::getDeviceId();
   Config config;
   if (configManager.loadConfiguration(config)) {
+    // Propagate worker name and wallet address to DeviceStateManager for display/runtime SSOT
+    DeviceStateManager::setWorkerName(config.workerName);
+    DeviceStateManager::setWalletAddress(config.walletAddress);
+    
     if (registrationManager->startRegistration(deviceId, config.workerName, config.walletAddress)) {
       Serial.println("[RSM] Registration started");
       // Stay in REGISTERING state
@@ -372,4 +487,60 @@ void RuntimeStateMachine::updateDeviceStateManager() {
   
   DeviceStateManager::setStatus(status);
   Serial.println("[RSM] Updated DeviceStateManager status: " + status);
+}
+
+void RuntimeStateMachine::onboardingFormCallback(const String& ssid, const String& password, const String& workerName, const String& walletAddress) {
+  Serial.println("[RSM] Onboarding form callback received");
+  Serial.print("[RSM] SSID: ");
+  Serial.println(ssid);
+  Serial.print("[RSM] Password: ");
+  Serial.println(password.length() > 0 ? "***" : "(empty)");
+  Serial.print("[RSM] Worker Name: ");
+  Serial.println(workerName);
+  Serial.print("[RSM] Wallet Address: ");
+  Serial.println(walletAddress);
+  
+  // Basic validation
+  if (ssid.isEmpty() || password.isEmpty() || workerName.isEmpty() || walletAddress.isEmpty()) {
+    Serial.println("[RSM] ERROR: Form validation failed - empty fields");
+    return;
+  }
+  
+  // Save configuration via ConfigManager
+  ConfigManager configManager;
+  Config config;
+  config.ssid = ssid;
+  config.password = password;
+  config.workerName = workerName;
+  config.walletAddress = walletAddress;
+  config.backendHost = "getbitmind.com";
+  config.backendPort = 443;
+  config.backendProtocol = "wss";
+  config.backendPath = "/ws";
+  
+  if (configManager.saveConfiguration(config)) {
+    Serial.println("[RSM] Configuration saved successfully");
+    
+    // Stop WebSetupServer (lifecycle symmetry: begin/start -> stop/end)
+    if (webSetupServer) {
+      webSetupServer->stop();
+      webSetupServer->end();
+      Serial.println("[RSM] WebSetupServer stopped");
+    }
+    
+    // Exit AP mode using WiFi.h directly (WiFiManager doesn't have AP mode methods)
+    WiFi.mode(WIFI_STA);
+    DeviceStateManager::setAPMode(false);
+    Serial.println("[RSM] AP mode exited");
+    
+    // Clear QR payload
+    DeviceStateManager::setQRPayload("");
+    Serial.println("[RSM] QR payload cleared");
+    
+    // Reboot to apply configuration
+    Serial.println("[RSM] Rebooting to apply configuration...");
+    ESP.restart();
+  } else {
+    Serial.println("[RSM] ERROR: Failed to save configuration");
+  }
 }

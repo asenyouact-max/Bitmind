@@ -9,7 +9,8 @@ BackendManager::BackendManager()
     connectionTimeout(30000), // 30 seconds default
     connectionAttempts(0),
     retryLimit(3),
-    currentPort(0) {
+    currentPort(0),
+    messageCallback(nullptr) {
   
   // Set instance for static callback
   instance = this;
@@ -25,7 +26,7 @@ void BackendManager::begin() {
   Serial.println("[BACKEND] WebSocket client initialized");
 }
 
-bool BackendManager::connect(const String& host, uint16_t port, const String& path) {
+bool BackendManager::connect(const String& host, uint16_t port, const String& path, const String& protocol) {
   if (host.isEmpty()) {
     Serial.println("[BACKEND] Host is empty, cannot connect");
     return false;
@@ -34,10 +35,19 @@ bool BackendManager::connect(const String& host, uint16_t port, const String& pa
   currentHost = host;
   currentPort = port;
   currentPath = path;
+  currentProtocol = protocol;
   
-  Serial.println("[BACKEND] Connecting to: " + host + ":" + String(port) + path);
+  Serial.println("[BACKEND] Connecting to: " + protocol + "://" + host + ":" + String(port) + path);
   
-  webSocket.begin(host.c_str(), port, path.c_str());
+  if (protocol == "wss") {
+    // Use TLS for secure WebSocket connection
+    webSocket.beginSSL(host.c_str(), port, path.c_str());
+    Serial.println("[BACKEND] Using TLS (wss) connection");
+  } else {
+    // Use non-TLS connection
+    webSocket.begin(host.c_str(), port, path.c_str());
+    Serial.println("[BACKEND] Using non-TLS (ws) connection");
+  }
   
   connectionStartTime = millis();
   connectionAttempts++;
@@ -74,7 +84,14 @@ void BackendManager::update() {
       
     case BackendState::RECONNECTING:
       Serial.println("[BACKEND] Reconnecting...");
-      webSocket.begin(currentHost.c_str(), currentPort, currentPath.c_str());
+      // Reconnect using the same protocol as initial connection
+      if (currentProtocol == "wss") {
+        webSocket.beginSSL(currentHost.c_str(), currentPort, currentPath.c_str());
+        Serial.println("[BACKEND] Reconnecting with TLS (wss)");
+      } else {
+        webSocket.begin(currentHost.c_str(), currentPort, currentPath.c_str());
+        Serial.println("[BACKEND] Reconnecting with non-TLS (ws)");
+      }
       connectionStartTime = millis();
       connectionAttempts++;
       setState(BackendState::CONNECTING);
@@ -153,7 +170,10 @@ void BackendManager::onWSEvent(WStype_t type, uint8_t* payload, size_t length) {
       
     case WStype_TEXT:
       Serial.println("[BACKEND] Received text message (length: " + String(length) + ")");
-      // Message handling will be implemented in later phases
+      if (messageCallback) {
+        String message = String((char*)payload, length);
+        messageCallback(message);
+      }
       break;
       
     case WStype_BIN:
@@ -183,40 +203,33 @@ void BackendManager::setState(BackendState newState) {
 
 void BackendManager::updateDeviceStateManager() {
   // Map backend state to device state
-  String backendStatus;
   bool backendConnected = false;
   
   switch (currentState) {
     case BackendState::DISCONNECTED:
-      backendStatus = "DISCONNECTED";
       backendConnected = false;
       break;
     case BackendState::CONNECTING:
-      backendStatus = "CONNECTING";
       backendConnected = false;
       break;
     case BackendState::CONNECTED:
-      backendStatus = "CONNECTED";
       backendConnected = true;
       break;
     case BackendState::CONNECTION_FAILED:
-      backendStatus = "CONNECTION_FAILED";
       backendConnected = false;
       break;
     case BackendState::RECONNECTING:
-      backendStatus = "RECONNECTING";
       backendConnected = false;
       break;
   }
   
-  DeviceStateManager::setBackendStatus(backendStatus);
   DeviceStateManager::setBackendConnected(backendConnected);
   
   if (backendConnected) {
     DeviceStateManager::setBackendHost(currentHost);
   }
   
-  Serial.println("[BACKEND] Updated DeviceStateManager: " + backendStatus);
+  Serial.println("[BACKEND] Updated DeviceStateManager: " + String(backendConnected ? "CONNECTED" : "DISCONNECTED"));
 }
 
 bool BackendManager::checkConnectionTimeout() {
@@ -236,6 +249,11 @@ bool BackendManager::sendMessage(const String& message) {
   }
   
   Serial.println("[BACKEND] Sending message: " + message);
-  webSocket.sendTXT(message);
+  webSocket.sendTXT(message.c_str(), message.length());
   return true;
+}
+
+void BackendManager::setMessageCallback(MessageCallback callback) {
+  messageCallback = callback;
+  Serial.println("[BACKEND] Message callback set");
 }
