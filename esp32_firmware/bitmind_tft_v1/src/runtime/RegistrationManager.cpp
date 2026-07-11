@@ -126,36 +126,31 @@ void RegistrationManager::setState(RegistrationState newState) {
 
 void RegistrationManager::updateDeviceStateManager() {
   // Map registration state to device state
-  String registrationStatus;
   bool registered = false;
   
   switch (currentState) {
     case RegistrationState::IDLE:
-      registrationStatus = "NOT_REGISTERED";
       registered = false;
       break;
     case RegistrationState::REGISTERING:
-      registrationStatus = "REGISTERING";
       registered = false;
       break;
     case RegistrationState::REGISTERED:
-      registrationStatus = "REGISTERED";
       registered = true;
       break;
     case RegistrationState::FAILED:
-      registrationStatus = "REGISTRATION_FAILED";
       registered = false;
       break;
   }
   
-  DeviceStateManager::setRegistrationStatus(registrationStatus);
   DeviceStateManager::setRegistered(registered);
   
   if (registered && !receivedToken.isEmpty()) {
     DeviceStateManager::setToken(receivedToken);
   }
   
-  Serial.println("[REG] Updated DeviceStateManager: " + registrationStatus);
+  Serial.print("[REG] Updated DeviceStateManager: ");
+  Serial.println(registered ? "REGISTERED" : "NOT_REGISTERED");
 }
 
 bool RegistrationManager::checkRegistrationTimeout() {
@@ -186,8 +181,15 @@ void RegistrationManager::sendRegistrationRequest() {
 void RegistrationManager::parseRegistrationResponse(const String& message) {
   Serial.println("[REG] Parsing registration response: " + message);
   
+  // Defensive check: only process actual registration response messages
+  // This prevents unrelated messages (e.g., welcome) from causing state transitions
+  if (message.indexOf("\"type\":\"device.registered\"") < 0) {
+    Serial.println("[REG] Not a registration response, ignoring");
+    return;
+  }
+  
   // Simple JSON parsing (will be replaced with proper JSON library in production)
-  // Expected format: {"success":true,"deviceId":"esp32-xxxx","token":"..."}
+  // Expected format: {"type":"device.registered","success":true,"deviceId":"esp32-xxxx","token":"..."}
   
   if (message.indexOf("\"success\":true") >= 0) {
     // Extract token

@@ -56,15 +56,33 @@ void RuntimeStateMachine::begin() {
   registrationManager->setBackendManager(backendManager);
   Serial.println("[RSM] RegistrationManager wired to BackendManager");
   
-  // Wire BackendManager message callback to RegistrationManager
-  Serial.println("[RSM] Wiring BackendManager message callback to RegistrationManager...");
+  // Wire BackendManager message callback to RuntimeStateMachine for routing
+  Serial.println("[RSM] Wiring BackendManager message callback to RuntimeStateMachine for message routing...");
   backendManager->setMessageCallback([this](const String& message) {
-    Serial.println("[RSM] BackendManager message callback invoked, forwarding to RegistrationManager");
-    if (registrationManager) {
-      registrationManager->handleRegistrationResponse(message);
+    Serial.println("[RSM] BackendManager message callback invoked, routing by message type");
+    
+    // Extract message type for routing
+    int typeIndex = message.indexOf("\"type\":\"");
+    if (typeIndex >= 0) {
+      int typeStart = typeIndex + 8; // Skip "type":"
+      int typeEnd = message.indexOf("\"", typeStart);
+      if (typeEnd > typeStart) {
+        String messageType = message.substring(typeStart, typeEnd);
+        Serial.println("[RSM] Message type: " + messageType);
+        
+        // Route registration-related messages to RegistrationManager
+        if (messageType == "device.registered") {
+          Serial.println("[RSM] Routing device.registered to RegistrationManager");
+          if (registrationManager) {
+            registrationManager->handleRegistrationResponse(message);
+          }
+        } else {
+          Serial.println("[RSM] Ignoring non-registration message: " + messageType);
+        }
+      }
     }
   });
-  Serial.println("[RSM] BackendManager message callback wired");
+  Serial.println("[RSM] BackendManager message callback wired to RuntimeStateMachine");
   
   Serial.println("[RSM] Initial state: BOOT");
 }
