@@ -18,7 +18,7 @@ class ShareValidator {
 
   /**
    * Rebuild exact 80-byte Bitcoin block header
-   * @param {Object} job - Mining job object
+   * @param {Object} job - Mining job object with device-specific merkleroot
    * @param {number} nonce - Nonce to test
    * @returns {Buffer} 80-byte block header
    */
@@ -39,8 +39,8 @@ class ShareValidator {
     offset += 32;
 
     // Merkle root (32 bytes, reversed)
-    // For pseudo mining, we use a simplified merkle root (all zeros)
-    const merkleRoot = Buffer.alloc(32, 0);
+    // Use device-specific calculated merkle root for real mining
+    const merkleRoot = Buffer.from(job.merkleroot || '0'.repeat(64), 'hex');
     for (let i = 0; i < 32; i++) {
       header[offset + i] = merkleRoot[31 - i]; // Reverse byte order
     }

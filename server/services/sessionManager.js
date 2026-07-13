@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { bitcoinWorkService } = require('./bitcoinWork');
 
 /**
  * Mining Session Class
@@ -30,6 +31,12 @@ class MiningSession {
     const deviceCount = this.activeDevices.size + 1;
     const nonceRange = this.calculateNonceRange(deviceCount);
     
+    // Construct device-specific mining work with valid coinbase and merkle root
+    const deviceWork = bitcoinWorkService.constructDeviceWork(
+      this.blockTemplate,
+      extranonce1
+    );
+    
     const deviceContext = {
       sessionId: this.sessionId,
       jobId: this.jobId,
@@ -43,11 +50,14 @@ class MiningSession {
       difficulty: this.blockTemplate.bits, // Real difficulty from bits
       version: this.blockTemplate.version,
       previousblockhash: this.blockTemplate.previousblockhash,
-      merkleroot: this.blockTemplate.merkleroot || '', // Real merkleroot from template
+      merkleroot: deviceWork.merkleroot, // Device-specific calculated merkle root
       curtime: this.blockTemplate.curtime,
       bits: this.blockTemplate.bits,
       coinbasevalue: this.blockTemplate.coinbasevalue,
-      coinbaseaddress: this.blockTemplate.coinbaseaddress || ''
+      coinbaseaddress: this.blockTemplate.coinbaseaddress || '',
+      // Store device-specific work context for validation
+      coinbaseTxid: deviceWork.coinbaseTxid,
+      allTxids: deviceWork.allTxids
     };
 
     this.activeDevices.set(deviceId, deviceContext);

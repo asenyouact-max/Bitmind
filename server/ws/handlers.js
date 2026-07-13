@@ -248,6 +248,20 @@ const handlers = {
 
       // Assign mining job using jobManager for full protocol compliance
       const { jobManager } = require('../services/jobManager');
+      
+      // T3.4: Initialize mining session if no active session exists
+      const { sessionManager } = require('../services/sessionManager');
+      if (!sessionManager.getCurrentSession()) {
+        console.log("[WS] NO_ACTIVE_SESSION deviceId=" + deviceId + " - initializing first mining job");
+        try {
+          await jobManager.generateMiningJob();
+          console.log("[WS] SESSION_INITIALIZED deviceId=" + deviceId);
+        } catch (error) {
+          console.log("[WS] SESSION_INIT_FAILED deviceId=" + deviceId + " error=" + error.message);
+          // Continue without session - device will get job on next refresh
+        }
+      }
+      
       const deviceContext = jobManager.assignWorkToDevice(deviceId);
 
       if (deviceContext) {
@@ -266,7 +280,7 @@ const handlers = {
             createdAt: currentJob.createdAt,
             version: currentJob.version,
             previousblockhash: currentJob.previousblockhash,
-            merkleroot: currentJob.merkleroot || '',
+            merkleroot: deviceContext.merkleroot, // Device-specific calculated merkle root
             nbits: currentJob.nbits,
             ntime: currentJob.ntime,
             deviceContext: {

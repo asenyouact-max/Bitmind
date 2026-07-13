@@ -61,7 +61,7 @@ class JobManager {
         // Required Bitcoin fields
         version: blockTemplate.version,
         previousblockhash: blockTemplate.previousblockhash,
-        merkleroot: blockTemplate.merkleroot || '', // Will be calculated by ESP
+        merkleroot: null, // Will be set per device during assignment (device-specific)
         nbits: blockTemplate.bits,
         ntime: blockTemplate.curtime,
         coinbasevalue: blockTemplate.coinbasevalue,
