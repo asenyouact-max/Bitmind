@@ -11,6 +11,7 @@ RuntimeStateMachine::RuntimeStateMachine(ScreenManager* screenManager)
     wifiManager(nullptr),
     backendManager(nullptr),
     registrationManager(nullptr),
+    miningManager(nullptr),
     webSetupServer(nullptr),
     screenManager(screenManager),
     cachedBackendPort(0),
@@ -19,13 +20,18 @@ RuntimeStateMachine::RuntimeStateMachine(ScreenManager* screenManager)
   wifiManager = new WiFiManager();
   backendManager = new BackendManager();
   registrationManager = new RegistrationManager();
+  miningManager = new MiningManager();
   webSetupServer = new WebSetupServer();
+  
+  // Wire BackendManager reference to MiningManager for share submission
+  miningManager->setBackendManager(backendManager);
 }
 
 RuntimeStateMachine::~RuntimeStateMachine() {
   delete wifiManager;
   delete backendManager;
   delete registrationManager;
+  delete miningManager;
   delete webSetupServer;
 }
 
@@ -46,6 +52,10 @@ void RuntimeStateMachine::begin() {
   Serial.println("[RSM] Initializing RegistrationManager...");
   registrationManager->begin();
   Serial.println("[RSM] RegistrationManager initialized");
+  
+  Serial.println("[RSM] Initializing MiningManager...");
+  miningManager->begin();
+  Serial.println("[RSM] MiningManager initialized");
   
   Serial.println("[RSM] Initializing WebSetupServer (registering HTTP handlers)...");
   webSetupServer->begin();
@@ -76,6 +86,16 @@ void RuntimeStateMachine::begin() {
           if (registrationManager) {
             registrationManager->handleRegistrationResponse(message);
           }
+        } else if (messageType == "mining.job") {
+          Serial.println("[RSM] Routing mining.job to MiningManager");
+          if (miningManager) {
+            miningManager->handleMiningJob(message);
+          }
+        } else if (messageType == "mining.share.result") {
+          Serial.println("[RSM] Routing mining.share.result to MiningManager");
+          if (miningManager) {
+            miningManager->handleShareResult(message);
+          }
         } else {
           Serial.println("[RSM] Ignoring non-registration message: " + messageType);
         }
@@ -97,6 +117,9 @@ void RuntimeStateMachine::update() {
   }
   if (registrationManager) {
     registrationManager->update();
+  }
+  if (miningManager) {
+    miningManager->update();
   }
   
   handleState();
@@ -390,14 +413,9 @@ void RuntimeStateMachine::handleBackendConnecting() {
 void RuntimeStateMachine::handleRegistering() {
   Serial.println("[RSM] REGISTERING: Starting device registration");
   
-  // Check if already registered
-  ConfigManager configManager;
-  if (configManager.isRegistered()) {
-    Serial.println("[RSM] Device already registered, proceeding to READY");
-    DeviceStateManager::setRegistered(true);
-    transitionTo(RuntimeState::READY);
-    return;
-  }
+  // Always perform registration handshake on backend connection
+  // Backend handles re-registers gracefully with device context preservation
+  // This ensures returning devices receive mining.job assignment
   
   // Check if RegistrationManager is already in progress
   if (registrationManager->getState() == RegistrationState::REGISTERING) {
@@ -420,8 +438,9 @@ void RuntimeStateMachine::handleRegistering() {
     return;
   }
   
-  // Start registration
+  // Start registration (works for both new and returning devices)
   String deviceId = DeviceIdentity::getDeviceId();
+  ConfigManager configManager;
   Config config;
   if (configManager.loadConfiguration(config)) {
     // Propagate worker name and wallet address to DeviceStateManager for display/runtime SSOT
@@ -447,9 +466,8 @@ void RuntimeStateMachine::handleReady() {
 }
 
 void RuntimeStateMachine::handleMining() {
-  Serial.println("[RSM] MINING: Mining will be implemented in T3.4");
-  // Mining implementation will be added in T3.4
-  // For now, stay in mining state
+  // Mining state active - MiningManager handles job receipt and share submission
+  // State transition is logged by transitionTo()
   DeviceStateManager::setStatus("MINING");
   DeviceStateManager::setMiningActive(true);
 }
