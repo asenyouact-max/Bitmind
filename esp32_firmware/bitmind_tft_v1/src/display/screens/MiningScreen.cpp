@@ -140,7 +140,7 @@ void MiningScreen::renderHashrate() {
   
   // Clear and redraw hashrate region if changed
   if (fabs(smoothedHashrate - lastHashrate) > 0.01f) {
-    display->setForegroundColor(TFT_BG_COLOR);
+    display->setBackgroundColor(TFT_BG_COLOR);
     display->fillRect(14, 90, 292, 50); // Clear hero region
     
     display->setForegroundColor(TFT_FG_COLOR);
@@ -167,7 +167,7 @@ void MiningScreen::renderStats() {
     workerDisplay = workerDisplay.substring(0, 12);
   }
   if (workerDisplay != lastWorker) {
-    display->setForegroundColor(0x1a1f26); // Clear with background color
+    display->setBackgroundColor(0x1a1f26); // Clear with background color
     display->fillRect(30, 200, 80, 14);
     display->setForegroundColor(TFT_FG_COLOR);
     display->drawText(30, 200, workerDisplay, 1);
@@ -176,7 +176,7 @@ void MiningScreen::renderStats() {
   
   // Shares (using accepted shares from state)
   if (state.acceptedShares != lastShares) {
-    display->setForegroundColor(0x1a1f26);
+    display->setBackgroundColor(0x1a1f26);
     display->fillRect(130, 200, 80, 14);
     display->setForegroundColor(TFT_BRAND_COLOR);
     display->drawText(130, 200, String(state.acceptedShares), 1);
@@ -187,7 +187,7 @@ void MiningScreen::renderStats() {
   // Using a fixed value for now since temp isn't in DeviceState
   const float tempDisplay = 58.0f; // Placeholder
   if (fabs(tempDisplay - lastTemp) > 0.5f) {
-    display->setForegroundColor(0x1a1f26);
+    display->setBackgroundColor(0x1a1f26);
     display->fillRect(230, 200, 80, 14);
     display->setForegroundColor(TFT_FG_COLOR);
     display->drawText(230, 200, String((int)tempDisplay) + "°C", 1);
