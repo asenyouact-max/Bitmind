@@ -2,16 +2,34 @@
 #include "../DeviceState.h"
 
 MiningScreen::MiningScreen(DisplayManager* displayManager)
-  : Screen(displayManager), lastUpdate(0) {
+  : Screen(displayManager), lastUpdate(0), staticRendered(false), 
+    lastHashrate(0.0f), smoothedHashrate(0.0f) {
   Serial.printf("[LIFECYCLE] MiningScreen::MiningScreen() - this=%p\n", this);
 }
 
 void MiningScreen::onEnter() {
   Serial.println("[SCREEN] Mining screen entered");
   lastUpdate = 0;
+  staticRendered = false;
+  lastHashrate = 0.0f;
+  smoothedHashrate = 0.0f;
 }
 
-void MiningScreen::render() {
+String MiningScreen::formatHashrate(float hashrateHps) {
+  // Adaptive human-readable formatting based on H/s value
+  if (hashrateHps < 1000.0f) {
+    // < 1,000 H/s → xxx H/s
+    return String((int)hashrateHps) + " H/s";
+  } else if (hashrateHps < 1000000.0f) {
+    // >= 1,000 H/s and < 1,000,000 H/s → x.xx kH/s
+    return String(hashrateHps / 1000.0f, 2) + " kH/s";
+  } else {
+    // >= 1,000,000 H/s → x.xx MH/s
+    return String(hashrateHps / 1000000.0f, 2) + " MH/s";
+  }
+}
+
+void MiningScreen::renderStatic() {
   const DeviceState& state = DeviceStateManager::getState();
   
   display->fillScreen(TFT_BG_COLOR);
@@ -35,21 +53,50 @@ void MiningScreen::render() {
   }
   display->drawText(20, 80, "Worker: " + workerDisplay, 2);
   
-  // Hashrate (left-aligned, size 3, Bitcoin Orange - prominent)
-  display->setForegroundColor(TFT_BRAND_COLOR);
-  display->drawText(20, 120, "Hashrate: " + String(state.hashrate, 1) + " MH/s", 3);
+  // Pool (left-aligned, size 1, light gray)
+  display->setForegroundColor(TFT_GRAY_COLOR);
+  display->drawText(20, 200, "Pool: stratum+tcp://...", 1);
   
   // Status (left-aligned, size 2, Bitcoin Orange with icon)
   display->setForegroundColor(TFT_BRAND_COLOR);
   display->drawText(20, 160, "● " + state.status, 2);
   
-  // Pool (left-aligned, size 1, light gray)
-  display->setForegroundColor(TFT_GRAY_COLOR);
-  display->drawText(20, 200, "Pool: stratum+tcp://...", 1);
-  
   // Uptime (left-aligned, size 1, light gray)
   display->setForegroundColor(TFT_GRAY_COLOR);
   display->drawText(20, 220, "Uptime: " + String(state.uptime / 60) + "m", 1);
+  
+  staticRendered = true;
+}
+
+void MiningScreen::renderHashrate() {
+  const DeviceState& state = DeviceStateManager::getState();
+  Serial.printf("[TRACE] SCREEN reading %.2f\n", state.hashrate);
+  
+  // Apply EMA smoothing to hashrate for display
+  if (smoothedHashrate == 0.0f) {
+    smoothedHashrate = state.hashrate;
+  } else {
+    smoothedHashrate = EMA_ALPHA * state.hashrate + (1.0f - EMA_ALPHA) * smoothedHashrate;
+  }
+  
+  // Clear and redraw hashrate region if changed
+  if (fabs(smoothedHashrate - lastHashrate) > 0.01f) {
+    display->setForegroundColor(TFT_BG_COLOR);
+    display->fillRect(20, 120, 300, 30);
+    
+    display->setForegroundColor(TFT_BRAND_COLOR);
+    Serial.printf("[TRACE] SCREEN formatting %.2f (smoothed)\n", smoothedHashrate);
+    display->drawText(20, 120, "Hashrate: " + formatHashrate(smoothedHashrate), 3);
+    
+    lastHashrate = smoothedHashrate;
+  }
+}
+
+void MiningScreen::render() {
+  if (!staticRendered) {
+    renderStatic();
+  }
+  renderHashrate();
 }
 
 void MiningScreen::update() {

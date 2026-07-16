@@ -905,6 +905,49 @@ TFT TRACK
 **Ready For Next Phase:**
 - Phase T4 - Touch Interaction (Touch events, gesture handling, interactive screens)
 
+------------------------------------------------------------------------------
+
+**Phase T3.1 - UI/UX Polish:**
+- Status: COMPLETE
+- Date: 2026-07-16
+- Commit: TBD
+
+**Achievements:**
+- Flicker removal implemented via dirty-region partial redraw
+- Static elements rendered once (header, worker, pool, status, uptime, separators)
+- Only hashrate numeric value is continuously dynamic
+- EMA smoothing implemented for hashrate display (alpha=0.2)
+- Presentation-layer smoothing only (no mining logic changes)
+- MiningScreen architecture split into renderStatic() and renderHashrate()
+- Cached previous hashrate value for dirty-region detection (lastHashrate)
+- No continuous full-screen clears
+- Status and uptime are static (update only on explicit lifecycle events)
+
+**Scope Compliance:**
+- UI/UX polish only (no architecture changes)
+- No backend protocol changes
+- No mining protocol changes
+- No mining logic changes
+- MiningEngine unchanged (raw metrics)
+- DeviceStateManager unchanged (raw telemetry)
+- MiningScreen remains renderer only (presentation smoothing)
+
+**Architecture:**
+- **Reusable (100%):** All existing architecture
+- **Enhanced:** MiningScreen (dirty-region rendering, EMA smoothing, hashrate-only dynamic update)
+- **Unchanged:** Backend protocol, mining protocol, device protocol, all business logic
+- **Ownership Maintained:** MiningEngine (raw metrics) → DeviceStateManager (display state) → MiningScreen (rendering only)
+
+**Files Modified:**
+- MiningScreen.h (added staticRendered, lastHashrate, smoothedHashrate, EMA_ALPHA, renderStatic(), renderHashrate())
+- MiningScreen.cpp (split render() into renderStatic() and renderHashrate(), implemented EMA smoothing, hashrate-only dirty-region detection)
+
+**TFT UI/UX Status:**
+- Flicker Removal: COMPLETE
+- Hashrate Smoothing: COMPLETE
+- Static Layout Stability: COMPLETE
+- Hashrate-Only Dynamic Update: COMPLETE
+
 ==============================================================================
 KNOWN COMPLETED FEATURES
 ==============================================================================
