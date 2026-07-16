@@ -16,14 +16,33 @@ private:
   
   // Cached previous values for dirty-region detection
   float lastHashrate;
+  String lastWorker;
+  uint32_t lastShares;
+  float lastTemp;
   
   // EMA smoothing for hashrate display
   float smoothedHashrate;
   static constexpr float EMA_ALPHA = 0.2f;
   
+  // Particle system (ambient background)
+  static constexpr int NUM_PARTICLES = 8;
+  struct Particle {
+    int x, y;
+    int vx, vy;
+    uint16_t color;
+    float alpha;
+    float pulse;
+  };
+  Particle particles[NUM_PARTICLES];
+  unsigned long lastParticleUpdate;
+  
   String formatHashrate(float hashrateHps);
   void renderStatic();
   void renderHashrate();
+  void renderStats();
+  void renderParticles();
+  void initParticles();
+  void updateParticles();
 };
 
 #endif // MINING_SCREEN_H
