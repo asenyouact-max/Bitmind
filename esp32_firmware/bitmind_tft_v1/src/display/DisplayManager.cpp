@@ -118,8 +118,8 @@ void DisplayManager::drawRect(int x, int y, int w, int h) {
 
 void DisplayManager::fillRect(int x, int y, int w, int h) {
   if (initialized) {
-    Serial.printf("[DEBUG] fillRect: x=%d, y=%d, w=%d, h=%d, color=0x%04X\n", x, y, w, h, foregroundColor);
-    display.fillRect(x, y, w, h, foregroundColor);
+    Serial.printf("[DEBUG] fillRect: x=%d, y=%d, w=%d, h=%d, color=0x%04X\n", x, y, w, h, backgroundColor);
+    display.fillRect(x, y, w, h, backgroundColor);
     Serial.println("[DEBUG] fillRect: completed");
   }
 }
