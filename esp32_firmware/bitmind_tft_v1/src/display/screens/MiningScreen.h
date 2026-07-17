@@ -19,6 +19,7 @@ private:
   String lastWorker;
   uint32_t lastShares;
   float lastTemp;
+  String lastStatusState; // Track state changes for status pill
   
   // EMA smoothing for hashrate display
   float smoothedHashrate;
@@ -40,9 +41,11 @@ private:
   void renderStatic();
   void renderHashrate();
   void renderStats();
+  void renderStatusPill();
   void renderParticles();
   void initParticles();
   void updateParticles();
+  String getCurrentStateKey();
 };
 
 #endif // MINING_SCREEN_H

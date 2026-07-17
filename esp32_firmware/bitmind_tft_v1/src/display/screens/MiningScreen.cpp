@@ -4,7 +4,7 @@
 MiningScreen::MiningScreen(DisplayManager* displayManager)
   : Screen(displayManager), lastUpdate(0), staticRendered(false), 
     lastHashrate(0.0f), lastWorker(""), lastShares(0), lastTemp(0.0f),
-    smoothedHashrate(0.0f), lastParticleUpdate(0) {
+    smoothedHashrate(0.0f), lastParticleUpdate(0), lastStatusState("") {
   Serial.printf("[LIFECYCLE] MiningScreen::MiningScreen() - this=%p\n", this);
   initParticles();
 }
@@ -19,6 +19,7 @@ void MiningScreen::onEnter() {
   lastTemp = 0.0f;
   smoothedHashrate = 0.0f;
   lastParticleUpdate = 0;
+  lastStatusState = "";
   initParticles();
 }
 
@@ -90,41 +91,87 @@ void MiningScreen::renderStatic() {
   
   display->fillScreen(TFT_BG_COLOR);
   
-  // Header row: Logo + Status pill
+  // Header row: Logo only (status pill is dynamic)
   // Logo: ₿ glyph + BITMIND text
   display->setForegroundColor(TFT_BRAND_COLOR);
-  display->drawText(14, 14, "₿", 2); // Bitcoin glyph
+  display->drawText(10, 10, "₿", 2); // Bitcoin glyph
   
   display->setForegroundColor(TFT_FG_COLOR);
-  display->drawText(38, 14, "BIT", 2);
+  display->drawText(34, 10, "BIT", 2);
   display->setForegroundColor(TFT_BRAND_COLOR);
-  display->drawText(78, 14, "MIND", 2);
+  display->drawText(74, 10, "MIND", 2);
   
-  // Status pill (ONLINE)
-  display->setForegroundColor(TFT_BRAND_COLOR);
-  display->drawText(250, 16, "●", 1);
-  display->setForegroundColor(TFT_FG_COLOR);
-  display->drawText(260, 16, "ONLINE", 1);
+  // Divider line (hairline)
+  display->setForegroundColor(TFT_LABEL_COLOR);
+  display->fillRect(10, 38, 300, 1);
   
-  // Divider line (gradient effect simulated with solid line)
-  display->setForegroundColor(TFT_GRAY_COLOR);
-  display->fillRect(14, 40, 292, 1);
+  // Bottom statistics row background (card surface)
+  display->setBackgroundColor(TFT_CARD_COLOR);
+  display->fillRect(10, 170, 300, 50);
   
-  // Hero section label
-  display->setForegroundColor(TFT_GRAY_COLOR);
-  display->drawText(160, 70, "HASHRATE", 1);
-  
-  // Bottom statistics row background
-  display->setForegroundColor(0x1a1f26); // Dark gray background
-  display->fillRect(14, 180, 292, 40);
-  
-  // Bottom stat labels
-  display->setForegroundColor(0x4a5361); // Darker gray for labels
-  display->drawText(30, 188, "WORKER", 1);
-  display->drawText(130, 188, "SHARES", 1);
-  display->drawText(230, 188, "TEMP", 1);
+  // Bottom stat labels (muted)
+  display->setForegroundColor(TFT_LABEL_COLOR);
+  display->drawText(20, 178, "Worker", 1);
+  display->drawText(120, 178, "Shares", 1);
+  display->drawText(220, 178, "Temp", 1);
   
   staticRendered = true;
+}
+
+String MiningScreen::getCurrentStateKey() {
+  const DeviceState& state = DeviceStateManager::getState();
+  
+  if (!state.wifiConnected || !state.registered) {
+    return "SYNC";
+  } else if (!state.miningActive) {
+    return "OFFLINE";
+  } else {
+    return "ONLINE";
+  }
+}
+
+void MiningScreen::renderStatusPill() {
+  const DeviceState& state = DeviceStateManager::getState();
+  String currentStateKey = getCurrentStateKey();
+  
+  // Only redraw if state changed
+  if (currentStateKey != lastStatusState) {
+    int pillX = 220;
+    int pillY = 8;
+    int pillW = 80;
+    int pillH = 20;
+    
+    // Determine status text and color
+    String statusText = "ONLINE";
+    uint16_t statusColor = TFT_BRAND_COLOR;
+    
+    if (currentStateKey == "SYNC") {
+      statusText = "SYNC";
+      statusColor = TFT_CYAN_COLOR;
+    } else if (currentStateKey == "OFFLINE") {
+      statusText = "OFFLINE";
+      statusColor = TFT_DIM_COLOR;
+    }
+    
+    // Clear and redraw status pill
+    display->setBackgroundColor(TFT_BG_COLOR);
+    display->fillRect(pillX, pillY, pillW, pillH);
+    
+    // Draw status pill background
+    display->setBackgroundColor(statusColor);
+    display->fillRect(pillX, pillY, pillW, pillH);
+    
+    // Status pill border
+    display->setForegroundColor(statusColor);
+    display->drawRect(pillX, pillY, pillW, pillH);
+    
+    // Status pill text
+    display->setForegroundColor(TFT_FG_COLOR);
+    display->drawText(pillX + 8, pillY + 4, "●", 1);
+    display->drawText(pillX + 20, pillY + 4, statusText, 1);
+    
+    lastStatusState = currentStateKey;
+  }
 }
 
 void MiningScreen::renderHashrate() {
@@ -141,18 +188,24 @@ void MiningScreen::renderHashrate() {
   // Clear and redraw hashrate region if changed
   if (fabs(smoothedHashrate - lastHashrate) > 0.01f) {
     display->setBackgroundColor(TFT_BG_COLOR);
-    display->fillRect(14, 90, 292, 50); // Clear hero region
+    display->fillRect(10, 50, 300, 100); // Clear hero region
     
-    display->setForegroundColor(TFT_FG_COLOR);
+    // Determine color based on state
+    uint16_t hashrateColor = TFT_FG_COLOR;
+    if (!state.wifiConnected || !state.registered) {
+      hashrateColor = TFT_DIM_COLOR; // Dimmed when offline/connecting
+    }
+    
+    display->setForegroundColor(hashrateColor);
     Serial.printf("[TRACE] SCREEN formatting %.2f (smoothed)\n", smoothedHashrate);
     
-    // Center the hashrate value
+    // Center the hashrate value (large, monospace-style)
     String hashrateStr = formatHashrate(smoothedHashrate);
-    int textWidth = hashrateStr.length() * 24; // Approximate width for size 4
+    int textWidth = hashrateStr.length() * 30; // Approximate width for size 5
     int x = (320 - textWidth) / 2;
-    if (x < 14) x = 14;
+    if (x < 10) x = 10;
     
-    display->drawText(x, 100, hashrateStr, 4);
+    display->drawText(x, 85, hashrateStr, 5); // Size 5 for dominant hero element
     
     lastHashrate = smoothedHashrate;
   }
@@ -161,36 +214,36 @@ void MiningScreen::renderHashrate() {
 void MiningScreen::renderStats() {
   const DeviceState& state = DeviceStateManager::getState();
   
-  // Worker name
+  // Worker name (column 1)
   String workerDisplay = state.workerName;
   if (workerDisplay.length() > 12) {
     workerDisplay = workerDisplay.substring(0, 12);
   }
   if (workerDisplay != lastWorker) {
-    display->setBackgroundColor(0x1a1f26); // Clear with background color
-    display->fillRect(30, 200, 80, 14);
+    display->setBackgroundColor(TFT_CARD_COLOR);
+    display->fillRect(20, 190, 80, 18);
     display->setForegroundColor(TFT_FG_COLOR);
-    display->drawText(30, 200, workerDisplay, 1);
+    display->drawText(20, 190, workerDisplay, 1);
     lastWorker = workerDisplay;
   }
   
-  // Shares (using accepted shares from state)
+  // Shares (column 2) - format with commas
+  String sharesDisplay = String(state.acceptedShares);
   if (state.acceptedShares != lastShares) {
-    display->setBackgroundColor(0x1a1f26);
-    display->fillRect(130, 200, 80, 14);
+    display->setBackgroundColor(TFT_CARD_COLOR);
+    display->fillRect(120, 190, 80, 18);
     display->setForegroundColor(TFT_BRAND_COLOR);
-    display->drawText(130, 200, String(state.acceptedShares), 1);
+    display->drawText(120, 190, sharesDisplay, 1);
     lastShares = state.acceptedShares;
   }
   
-  // Temperature (placeholder - not available in current state)
-  // Using a fixed value for now since temp isn't in DeviceState
+  // Temperature (column 3) - placeholder since temp not in DeviceState
   const float tempDisplay = 58.0f; // Placeholder
   if (fabs(tempDisplay - lastTemp) > 0.5f) {
-    display->setBackgroundColor(0x1a1f26);
-    display->fillRect(230, 200, 80, 14);
+    display->setBackgroundColor(TFT_CARD_COLOR);
+    display->fillRect(220, 190, 80, 18);
     display->setForegroundColor(TFT_FG_COLOR);
-    display->drawText(230, 200, String((int)tempDisplay) + "°C", 1);
+    display->drawText(220, 190, String((int)tempDisplay) + "°C", 1);
     lastTemp = tempDisplay;
   }
 }
@@ -199,6 +252,7 @@ void MiningScreen::render() {
   if (!staticRendered) {
     renderStatic();
   }
+  renderStatusPill();
   renderHashrate();
   renderStats();
   // renderParticles(); // Disabled for now to avoid full-screen clears
