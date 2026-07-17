@@ -5,12 +5,13 @@
 #include "screens/RegisteringScreen.h"
 #include "screens/MiningScreen.h"
 #include "screens/ErrorScreen.h"
+#include <type_traits>
 
 ScreenManager::ScreenManager(DisplayManager* displayManager)
   : displayManager(displayManager),
     currentScreen(nullptr),
     previousScreen(nullptr),
-    renderDirty(true),
+    renderDirty(false),
     splashScreen(nullptr),
     setupScreen(nullptr),
     connectingScreen(nullptr),
@@ -70,10 +71,10 @@ void ScreenManager::end() {
 
 void ScreenManager::update() {
   const DeviceState& state = DeviceStateManager::getState();
-  
+
   // Determine which screen should be active based on state
   Screen* targetScreen = nullptr;
-  
+
   if (state.apMode) {
     targetScreen = setupScreen;
   } else if (state.status == "ERROR") {
@@ -87,12 +88,12 @@ void ScreenManager::update() {
   } else {
     targetScreen = splashScreen;
   }
-  
+
   // Transition if needed
   if (targetScreen && targetScreen != currentScreen) {
     switchScreen(targetScreen);
   }
-  
+
   // Update current screen
   if (currentScreen) {
     currentScreen->update();
@@ -100,16 +101,11 @@ void ScreenManager::update() {
 }
 
 void ScreenManager::render() {
-  // Phase T2.7: Only render when dirty (screen changed or state changed)
-  if (!renderDirty) {
-    return;
-  }
-  
   if (currentScreen && displayManager->isInitialized()) {
-    displayManager->clear();
+    // Removed displayManager->clear() to allow dirty-region rendering
+    // Screens handle their own clearing in renderStatic()
     currentScreen->render();
     displayManager->refresh();
-    renderDirty = false;  // Clear dirty flag after render
   }
 }
 
@@ -117,22 +113,51 @@ Screen* ScreenManager::getCurrentScreen() {
   return currentScreen;
 }
 
+void ScreenManager::markDirty() {
+  renderDirty = true;
+}
+
 void ScreenManager::switchScreen(Screen* newScreen) {
   if (newScreen == currentScreen) {
     return;
   }
-  
+
   if (currentScreen) {
     currentScreen->onExit();
   }
-  
+
   previousScreen = currentScreen;
   currentScreen = newScreen;
-  
+
   if (currentScreen) {
     currentScreen->onEnter();
   }
-  
-  renderDirty = true;  // Phase T2.7: Mark dirty on screen transition
+
   Serial.println("[SCREEN_MANAGER] Transitioned to screen");
 }
+
+// Template implementation for transitionTo (requires complete types for std::is_same)
+template<typename T>
+void ScreenManager::transitionTo() {
+  if (std::is_same<T, SplashScreen>::value) {
+    switchScreen(splashScreen);
+  } else if (std::is_same<T, SetupScreen>::value) {
+    switchScreen(setupScreen);
+  } else if (std::is_same<T, ConnectingScreen>::value) {
+    switchScreen(connectingScreen);
+  } else if (std::is_same<T, RegisteringScreen>::value) {
+    switchScreen(registeringScreen);
+  } else if (std::is_same<T, MiningScreen>::value) {
+    switchScreen(miningScreen);
+  } else if (std::is_same<T, ErrorScreen>::value) {
+    switchScreen(errorScreen);
+  }
+}
+
+// Explicit template instantiations
+template void ScreenManager::transitionTo<SplashScreen>();
+template void ScreenManager::transitionTo<SetupScreen>();
+template void ScreenManager::transitionTo<ConnectingScreen>();
+template void ScreenManager::transitionTo<RegisteringScreen>();
+template void ScreenManager::transitionTo<MiningScreen>();
+template void ScreenManager::transitionTo<ErrorScreen>();
