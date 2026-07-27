@@ -91,29 +91,38 @@ void MiningScreen::renderStatic() {
   
   display->fillScreen(TFT_BG_COLOR);
   
-  // Header row: Logo only (status pill is dynamic)
-  // Logo: ₿ glyph + BITMIND text with improved spacing
+  // Header row: Logo (status pill is dynamic)
+  // Logo: ₿ glyph + BITMIND text matching HTML spec
+  // HTML: glyph 26x26, text 22px, gap 8px
   display->setForegroundColor(TFT_BRAND_COLOR);
-  display->drawText(20, 20, "₿", 4); // Bitcoin glyph, size 4 for better visibility
+  display->drawText(14, 12, "₿", 4); // Bitcoin glyph at top-left with padding
   
   display->setForegroundColor(TFT_FG_COLOR);
-  display->drawText(60, 20, "BIT", 4); // Size 4 for branding
+  display->drawText(44, 12, "BIT", 4); // White "BIT"
   display->setForegroundColor(TFT_BRAND_COLOR);
-  display->drawText(116, 20, "MIND", 4); // Size 4 for branding
+  display->drawText(84, 12, "MIND", 4); // Orange "MIND"
   
-  // Divider line (hairline) with increased whitespace
+  // Divider line (hairline) matching HTML spec
+  // HTML: height 1px, margin 10px 0, gradient
   display->setForegroundColor(TFT_LABEL_COLOR);
-  display->fillRect(20, 60, 280, 1);
+  display->fillRect(14, 44, 292, 1);
   
-  // Bottom statistics row background (card surface) with improved padding
+  // Hero subtitle: "Hashrate" label (muted, small, uppercase)
+  // HTML: 9px, #7d8a99, letter-spacing 0.15em, uppercase
+  display->setForegroundColor(TFT_LABEL_COLOR);
+  display->drawTextCentered(75, "Hashrate", 1);
+  
+  // Bottom statistics row background (semi-transparent card)
+  // HTML: rgba(11,15,20,0.4), padding 6px 4px 0, border-radius 4px
   display->setBackgroundColor(TFT_CARD_COLOR);
-  display->fillRect(20, 170, 280, 60);
+  display->fillRect(14, 200, 292, 36);
   
-  // Bottom stat labels (muted) with better spacing
-  display->setForegroundColor(TFT_LABEL_COLOR);
-  display->drawText(30, 182, "Worker", 1);
-  display->drawText(120, 182, "Shares", 1);
-  display->drawText(210, 182, "Temp", 1);
+  // Bottom stat labels (muted, small, uppercase)
+  // HTML: 8px, #4a5361, uppercase
+  display->setForegroundColor(TFT_DIM_COLOR);
+  display->drawText(18, 206, "Worker", 1);
+  display->drawText(110, 206, "Shares", 1);
+  display->drawText(202, 206, "Temp", 1);
   
   staticRendered = true;
 }
@@ -136,10 +145,11 @@ void MiningScreen::renderStatusPill() {
   
   // Only redraw if state changed
   if (currentStateKey != lastStatusState) {
-    int pillX = 195;
-    int pillY = 20;
-    int pillW = 105;
-    int pillH = 28;
+    // HTML spec: padding 3px 8px, border 1px, font 9px, gap 5px
+    int pillX = 230;
+    int pillY = 12;
+    int pillW = 76;
+    int pillH = 20;
     
     // Determine status text and color
     String statusText = "ONLINE";
@@ -157,15 +167,15 @@ void MiningScreen::renderStatusPill() {
     display->setBackgroundColor(TFT_BG_COLOR);
     display->fillRect(pillX, pillY, pillW, pillH);
     
-    // Draw status pill background (no fill, just border for premium look)
+    // Draw status pill border (HTML: border 1px, transparent interior)
     display->setForegroundColor(statusColor);
     display->drawRect(pillX, pillY, pillW, pillH);
     
-    // Status pill text with better padding
+    // Status pill dot and text (HTML: gap 5px, font 9px)
     display->setForegroundColor(statusColor);
-    display->drawText(pillX + 12, pillY + 8, "●", 1);
-    display->setForegroundColor(TFT_FG_COLOR);
-    display->drawText(pillX + 28, pillY + 8, statusText, 1);
+    display->drawText(pillX + 6, pillY + 5, "●", 1);
+    display->setForegroundColor(statusColor);
+    display->drawText(pillX + 14, pillY + 5, statusText, 1);
     
     lastStatusState = currentStateKey;
   }
@@ -185,24 +195,37 @@ void MiningScreen::renderHashrate() {
   // Clear and redraw hashrate region if changed
   if (fabs(smoothedHashrate - lastHashrate) > 0.01f) {
     display->setBackgroundColor(TFT_BG_COLOR);
-    display->fillRect(20, 70, 280, 90); // Clear hero region with improved spacing
+    display->fillRect(14, 85, 292, 50); // Clear hero value region
     
-    // Determine color based on state - Bitcoin Orange dominates when online
-    uint16_t hashrateColor = TFT_BRAND_COLOR; // Primary accent for hashrate
+    // Determine color based on state - white value, orange unit
+    uint16_t valueColor = TFT_FG_COLOR; // White for value
+    uint16_t unitColor = TFT_BRAND_COLOR; // Orange for unit
     if (!state.wifiConnected || !state.registered) {
-      hashrateColor = TFT_DIM_COLOR; // Dimmed when offline/connecting
+      valueColor = TFT_DIM_COLOR; // Dimmed when offline/connecting
+      unitColor = TFT_DIM_COLOR;
     }
     
-    display->setForegroundColor(hashrateColor);
+    display->setForegroundColor(valueColor);
     Serial.printf("[TRACE] SCREEN formatting %.2f (smoothed)\n", smoothedHashrate);
     
-    // Center the hashrate value (dominant hero element, size 7 for maximum impact)
+    // HTML spec: 38px font, white value, orange unit (15px), gap 6px
+    // Center the hashrate value (dominant hero element)
     String hashrateStr = formatHashrate(smoothedHashrate);
-    int textWidth = hashrateStr.length() * 42; // Approximate width for size 7
-    int x = (320 - textWidth) / 2;
-    if (x < 20) x = 20;
+    String unitStr = "H/s";
     
-    display->drawText(x, 105, hashrateStr, 7); // Size 7 for maximum dominance
+    // Calculate combined width for centering
+    int valueWidth = hashrateStr.length() * 24; // Approximate for size 6
+    int unitWidth = unitStr.length() * 12; // Approximate for size 3
+    int totalWidth = valueWidth + unitWidth + 6; // +6px gap
+    int x = (320 - totalWidth) / 2;
+    if (x < 14) x = 14;
+    
+    // Draw value (white, large)
+    display->drawText(x, 95, hashrateStr, 6);
+    
+    // Draw unit (orange, smaller)
+    display->setForegroundColor(unitColor);
+    display->drawText(x + valueWidth + 6, 108, unitStr, 3);
     
     lastHashrate = smoothedHashrate;
   }
@@ -211,36 +234,36 @@ void MiningScreen::renderHashrate() {
 void MiningScreen::renderStats() {
   const DeviceState& state = DeviceStateManager::getState();
   
-  // Worker name (column 1) - larger font for values
+  // Worker name (column 1) - HTML: 12px, white
   String workerDisplay = state.workerName;
   if (workerDisplay.length() > 12) {
     workerDisplay = workerDisplay.substring(0, 12);
   }
   if (workerDisplay != lastWorker) {
     display->setBackgroundColor(TFT_CARD_COLOR);
-    display->fillRect(30, 198, 80, 22);
+    display->fillRect(18, 216, 92, 16);
     display->setForegroundColor(TFT_FG_COLOR);
-    display->drawText(30, 198, workerDisplay, 2); // Size 2 for value hierarchy
+    display->drawText(18, 216, workerDisplay, 2); // Size 2 for value
     lastWorker = workerDisplay;
   }
   
-  // Shares (column 2) - format with commas, larger font, Bitcoin Orange
+  // Shares (column 2) - HTML: 12px, orange
   String sharesDisplay = String(state.acceptedShares);
   if (state.acceptedShares != lastShares) {
     display->setBackgroundColor(TFT_CARD_COLOR);
-    display->fillRect(120, 198, 80, 22);
-    display->setForegroundColor(TFT_BRAND_COLOR); // Bitcoin Orange for important value
-    display->drawText(120, 198, sharesDisplay, 2); // Size 2 for value hierarchy
+    display->fillRect(110, 216, 92, 16);
+    display->setForegroundColor(TFT_BRAND_COLOR); // Orange for shares
+    display->drawText(110, 216, sharesDisplay, 2); // Size 2 for value
     lastShares = state.acceptedShares;
   }
   
-  // Temperature (column 3) - placeholder since temp not in DeviceState
+  // Temperature (column 3) - HTML: 12px, white
   const float tempDisplay = 58.0f; // Placeholder
   if (fabs(tempDisplay - lastTemp) > 0.5f) {
     display->setBackgroundColor(TFT_CARD_COLOR);
-    display->fillRect(210, 198, 80, 22);
+    display->fillRect(202, 216, 92, 16);
     display->setForegroundColor(TFT_FG_COLOR);
-    display->drawText(210, 198, String((int)tempDisplay) + "°C", 2); // Size 2 for value hierarchy
+    display->drawText(202, 216, String((int)tempDisplay) + "°C", 2); // Size 2 for value
     lastTemp = tempDisplay;
   }
 }
