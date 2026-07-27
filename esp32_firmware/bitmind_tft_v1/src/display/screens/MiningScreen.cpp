@@ -43,7 +43,7 @@ void MiningScreen::initParticles() {
     particles[i].y = random(0, 240);
     particles[i].vx = random(-1, 2);
     particles[i].vy = random(-1, 2);
-    particles[i].color = (random(0, 10) < 7) ? TFT_BRAND_COLOR : 0x001F; // Orange or cyan
+    particles[i].color = (random(0, 10) < 7) ? TFT_BRAND_COLOR : TFT_CYAN_COLOR; // Orange or cyan
     particles[i].alpha = 0.3f + (random(0, 100) / 200.0f);
     particles[i].pulse = random(0, 628) / 100.0f;
   }
@@ -71,7 +71,7 @@ void MiningScreen::renderParticles() {
   updateParticles();
   
   // Clear particle region (full screen for simplicity, could be optimized)
-  display->fillScreen(TFT_BG_COLOR);
+  display->fillScreen(TFT_BG_COLOR); // Uses DisplayManager abstraction
   
   // Render particles
   for (int i = 0; i < NUM_PARTICLES; i++) {
@@ -112,9 +112,9 @@ void MiningScreen::renderStatic() {
   display->setForegroundColor(TFT_LABEL_COLOR);
   display->drawTextCentered(75, "Hashrate", 1);
   
-  // Bottom statistics row background (semi-transparent card)
+  // Bottom statistics row background (surface color)
   // HTML: rgba(11,15,20,0.4), padding 6px 4px 0, border-radius 4px
-  display->setBackgroundColor(TFT_CARD_COLOR);
+  display->setBackgroundColor(TFT_SURFACE_COLOR);
   display->fillRect(14, 200, 292, 36);
   
   // Bottom stat labels (muted, small, uppercase)
@@ -240,7 +240,7 @@ void MiningScreen::renderStats() {
     workerDisplay = workerDisplay.substring(0, 12);
   }
   if (workerDisplay != lastWorker) {
-    display->setBackgroundColor(TFT_CARD_COLOR);
+    display->setBackgroundColor(TFT_SURFACE_COLOR);
     display->fillRect(18, 216, 92, 16);
     display->setForegroundColor(TFT_FG_COLOR);
     display->drawText(18, 216, workerDisplay, 2); // Size 2 for value
@@ -250,7 +250,7 @@ void MiningScreen::renderStats() {
   // Shares (column 2) - HTML: 12px, orange
   String sharesDisplay = String(state.acceptedShares);
   if (state.acceptedShares != lastShares) {
-    display->setBackgroundColor(TFT_CARD_COLOR);
+    display->setBackgroundColor(TFT_SURFACE_COLOR);
     display->fillRect(110, 216, 92, 16);
     display->setForegroundColor(TFT_BRAND_COLOR); // Orange for shares
     display->drawText(110, 216, sharesDisplay, 2); // Size 2 for value
@@ -260,7 +260,7 @@ void MiningScreen::renderStats() {
   // Temperature (column 3) - HTML: 12px, white
   const float tempDisplay = 58.0f; // Placeholder
   if (fabs(tempDisplay - lastTemp) > 0.5f) {
-    display->setBackgroundColor(TFT_CARD_COLOR);
+    display->setBackgroundColor(TFT_SURFACE_COLOR);
     display->fillRect(202, 216, 92, 16);
     display->setForegroundColor(TFT_FG_COLOR);
     display->drawText(202, 216, String((int)tempDisplay) + "°C", 2); // Size 2 for value

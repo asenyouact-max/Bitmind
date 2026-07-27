@@ -9,21 +9,16 @@
 #define TFT_HEIGHT 320
 #define TFT_BL     21  // Backlight control pin
 
-// Color definitions - Bitcoin Orange Brand Identity (T5.1 spec)
+// Color definitions - T5.4.1 Final Palette (locked)
 // RGB565 format: (R << 11) | (G << 5) | B
 // RGB values scaled to 5/6/5 bits: R = (R8/255)*31, G = (G8/255)*63, B = (B8/255)*31
-#define TFT_BG_COLOR      0x0862  // #0b0f14 - Near-black background
-#define TFT_FG_COLOR      0xE73E  // #e6edf3 - Primary text
-#define TFT_BRAND_COLOR   0xF4C3  // #f7931a - Bitcoin Orange (primary accent)
-#define TFT_CYAN_COLOR    0x041F  // #00c3ff - Cyan (secondary accent, connecting states)
-#define TFT_CARD_COLOR    0x094B  // #121821 - Card/panel surface
-#define TFT_LABEL_COLOR   0x7BEF  // #7d8a99 - Muted text (labels)
-#define TFT_DIM_COLOR     0x528A  // #4a5361 - Disabled/offline values
-#define TFT_SUCCESS_COLOR 0x07E0  // Green (success/connected only)
-#define TFT_ERROR_COLOR   0xF800  // Red
-#define TFT_WARN_COLOR    0xFD20  // Orange (warning/activity)
-#define TFT_INFO_COLOR    0x001F  // Blue
-#define TFT_GRAY_COLOR    0xC618  // Light gray (secondary text)
+#define TFT_BG_COLOR      0x0862  // Background - Near-black
+#define TFT_SURFACE_COLOR 0x10C4  // Surface - Card/panel background
+#define TFT_BRAND_COLOR   0xF483  // Bitcoin Orange - Primary accent
+#define TFT_CYAN_COLOR    0x061F  // Cyan - Secondary accent
+#define TFT_FG_COLOR      0xE77E  // Primary Text - White
+#define TFT_LABEL_COLOR   0x7C53  // Muted Text - Labels
+#define TFT_DIM_COLOR     0x4A8C  // Dim Text - Disabled/offline
 
 class DisplayManager {
 public:
