@@ -20,7 +20,7 @@ void SetupScreen::render() {
   display->drawTextCentered(20, "BITMIND SETUP", 3);
   
   // Separator line
-  display->setForegroundColor(TFT_GRAY_COLOR);
+  display->setForegroundColor(TFT_LABEL_COLOR);
   display->fillRect(10, 50, 300, 2);
   
   // Connect to WiFi (left-aligned, size 2, white)
@@ -38,15 +38,15 @@ void SetupScreen::render() {
   display->setForegroundColor(TFT_FG_COLOR);
   display->drawText(20, 160, "Scan QR code or open:", 2);
   
-  // URL (left-aligned, size 2, light gray)
-  display->setForegroundColor(TFT_GRAY_COLOR);
+  // URL (left-aligned, size 2, muted)
+  display->setForegroundColor(TFT_LABEL_COLOR);
   display->drawText(20, 190, "http://" + state.apIP, 2);
   
   // QR Code (centered, scale 4)
   display->drawQRCodeCentered(200, state.qrPayload, 4);
   
-  // Instructions (left-aligned, size 1, light gray)
-  display->setForegroundColor(TFT_GRAY_COLOR);
+  // Instructions (left-aligned, size 1, muted)
+  display->setForegroundColor(TFT_LABEL_COLOR);
   display->drawText(20, 210, "1. Connect to WiFi above", 1);
   display->drawText(20, 225, "2. Scan QR or open URL", 1);
   display->drawText(20, 240, "3. Configure device", 1);

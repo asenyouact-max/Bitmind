@@ -24,8 +24,8 @@ void ConnectingScreen::render() {
   display->drawTextCentered(20, "CONNECTING", 3);
   
   // Separator line
-  Serial.println("[DEBUG] ConnectingScreen::render: setting foreground color to gray");
-  display->setForegroundColor(TFT_GRAY_COLOR);
+  Serial.println("[DEBUG] ConnectingScreen::render: setting foreground color to label");
+  display->setForegroundColor(TFT_LABEL_COLOR);
   Serial.println("[DEBUG] ConnectingScreen::render: calling fillRect for separator");
   display->fillRect(10, 50, 300, 2);
   
@@ -53,9 +53,9 @@ void ConnectingScreen::render() {
   Serial.println("[DEBUG] ConnectingScreen::render: calling drawText for server hostname");
   display->drawText(20, 200, "● getbitmind.com", 2);
   
-  // Please wait... (centered, size 2, light gray)
-  Serial.println("[DEBUG] ConnectingScreen::render: setting foreground color to gray");
-  display->setForegroundColor(TFT_GRAY_COLOR);
+  // Please wait... (centered, size 2, muted)
+  Serial.println("[DEBUG] ConnectingScreen::render: setting foreground color to label");
+  display->setForegroundColor(TFT_LABEL_COLOR);
   Serial.println("[DEBUG] ConnectingScreen::render: calling drawTextCentered for wait message");
   display->drawTextCentered(240, "Please wait...", 2);
   
