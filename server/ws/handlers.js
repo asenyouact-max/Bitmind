@@ -262,11 +262,10 @@ const handlers = {
         }
       }
       
-      const deviceContext = jobManager.assignWorkToDevice(deviceId);
+      const currentJob = jobManager.getCurrentJob();
+      const deviceContext = jobManager.assignWorkToDevice(deviceId, currentJob);
 
       if (deviceContext) {
-        // Get current job from jobManager
-        const currentJob = jobManager.getCurrentJob();
         if (currentJob) {
           // Create protocol-compliant mining.job message with all required fields
           const miningJobMsg = {
@@ -274,9 +273,9 @@ const handlers = {
             jobId: currentJob.jobId,
             sessionId: deviceContext.sessionId,
             height: currentJob.height,
-            target: currentJob.target,
-            pseudoTarget: currentJob.pseudoTarget || null,
-            pseudoMining: currentJob.pseudoMining || false,
+            target: deviceContext.effectiveTarget, // Use effective target from deviceContext
+            pseudoTarget: deviceContext.pseudoTarget, // Use pseudoTarget from deviceContext
+            pseudoMining: deviceContext.pseudoMining, // Use pseudoMining from deviceContext
             createdAt: currentJob.createdAt,
             version: currentJob.version,
             previousblockhash: currentJob.previousblockhash,
