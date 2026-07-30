@@ -167,13 +167,21 @@ class JobManager {
       let broadcastCount = 0;
       for (const [deviceId, device] of devices) {
         if (device.ws && device.ws.readyState === 1) { // WebSocket.OPEN
-          const deviceContext = this.assignWorkToDevice(deviceId);
+          const deviceContext = this.assignWorkToDevice(deviceId, job);
           
           if (deviceContext) {
-            // Create device-specific job with context
+            // Create device-specific job with context and effective target
             const deviceJob = {
               ...job,
-              deviceContext
+              target: deviceContext.effectiveTarget, // Phase 1: Use effective target
+              pseudoTarget: deviceContext.pseudoTarget, // Phase 1: Keep for backward compatibility
+              pseudoMining: deviceContext.pseudoMining, // Phase 1: Keep for backward compatibility
+              deviceContext: {
+                sessionId: deviceContext.sessionId,
+                nonceStart: deviceContext.nonceStart,
+                nonceEnd: deviceContext.nonceEnd,
+                extranonce1: deviceContext.extranonce1
+              }
             };
             
             device.ws.send(JSON.stringify(deviceJob));
@@ -186,7 +194,9 @@ class JobManager {
                 deviceId,
                 sessionId: deviceContext.sessionId,
                 nonceRange: `${deviceContext.nonceStart}-${deviceContext.nonceEnd}`,
-                extranonce1: deviceContext.extranonce1
+                extranonce1: deviceContext.extranonce1,
+                effectiveTarget: deviceContext.effectiveTarget,
+                pseudoMining: deviceContext.pseudoMining
               }
             });
           }
@@ -240,20 +250,69 @@ class JobManager {
   }
 
   /**
-   * Assign work to a specific device
+   * Determine if device should use pseudo-mining mode
    * @param {string} deviceId - Device identifier
-   * @returns {Object|null} Device context with assigned work
+   * @returns {boolean} True if device should use pseudo-mining
    */
-  assignWorkToDevice(deviceId) {
+  shouldUsePseudoMining(deviceId) {
+    // ESP32 devices use pseudo-mining for demonstration/testing
+    // ASIC devices use real mining
+    return deviceId.startsWith('esp32-');
+  }
+
+  /**
+   * Calculate pseudo-target from real target for low-power devices
+   * Adds 12-16 leading zeros to make target achievable at ~600 H/s
+   * @param {string} realTarget - Real Bitcoin target (64 hex chars)
+   * @returns {string} Pseudo-target with adjusted difficulty
+   */
+  calculatePseudoTarget(realTarget) {
+    // For pseudo-mining, add 14 leading zeros to the target
+    // This makes it ~2^56 times easier, suitable for ESP32 at ~600 H/s
+    // Expected time: ~1-2 hours per share instead of ~6,700 years
+    const leadingZeros = '00000000000000'; // 14 zeros
+    const adjustedTarget = leadingZeros + realTarget.substring(14);
+    console.log('[JOB_MANAGER] PSEUDO_TARGET_CALCULATED real=' + realTarget + ' pseudo=' + adjustedTarget);
+    return adjustedTarget;
+  }
+
+  /**
+   * Assign work to a specific device with target selection
+   * @param {string} deviceId - Device identifier
+   * @param {Object} baseJob - Base job with real target
+   * @returns {Object|null} Device context with assigned work and selected target
+   */
+  assignWorkToDevice(deviceId, baseJob) {
     const deviceContext = sessionManager.assignDevice(deviceId);
     
     if (!deviceContext) {
       console.log('[JOB_MANAGER] NO_ACTIVE_SESSION deviceId=' + deviceId);
       return null;
     }
+
+    // Determine if device should use pseudo-mining
+    const usePseudoMining = this.shouldUsePseudoMining(deviceId);
     
-    console.log('[JOB_MANAGER] WORK_ASSIGNED deviceId=' + deviceId + ' sessionId=' + deviceContext.sessionId + ' nonceRange=' + deviceContext.nonceStart + '-' + deviceContext.nonceEnd);
-    return deviceContext;
+    // Select effective target based on device type
+    let effectiveTarget;
+    let pseudoTarget = null;
+    
+    if (usePseudoMining) {
+      pseudoTarget = this.calculatePseudoTarget(baseJob.target);
+      effectiveTarget = pseudoTarget;
+      console.log('[JOB_MANAGER] PSEUDO_MINING_ENABLED deviceId=' + deviceId + ' effectiveTarget=' + effectiveTarget);
+    } else {
+      effectiveTarget = baseJob.target;
+      console.log('[JOB_MANAGER] REAL_MINING deviceId=' + deviceId + ' effectiveTarget=' + effectiveTarget);
+    }
+
+    // Return device context with target selection
+    return {
+      ...deviceContext,
+      effectiveTarget,
+      pseudoTarget,
+      pseudoMining: usePseudoMining
+    };
   }
 
   /**
@@ -275,10 +334,27 @@ class JobManager {
    * @param {string} deviceId - Device identifier
    */
   handleDeviceConnection(ws, deviceId) {
-    // Send current job to newly connected device
+    // Send current job to newly connected device with target selection
     if (this.currentJob) {
       console.log(`📤 Sending current job to new device: ${deviceId}`);
-      ws.send(JSON.stringify(this.currentJob));
+      
+      const deviceContext = this.assignWorkToDevice(deviceId, this.currentJob);
+      
+      if (deviceContext) {
+        const deviceJob = {
+          ...this.currentJob,
+          target: deviceContext.effectiveTarget, // Phase 1: Use effective target
+          pseudoTarget: deviceContext.pseudoTarget, // Phase 1: Keep for backward compatibility
+          pseudoMining: deviceContext.pseudoMining, // Phase 1: Keep for backward compatibility
+          deviceContext: {
+            sessionId: deviceContext.sessionId,
+            nonceStart: deviceContext.nonceStart,
+            nonceEnd: deviceContext.nonceEnd,
+            extranonce1: deviceContext.extranonce1
+          }
+        };
+        ws.send(JSON.stringify(deviceJob));
+      }
     }
   }
 
