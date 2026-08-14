@@ -262,18 +262,56 @@ class JobManager {
 
   /**
    * Calculate pseudo-target from real target for low-power devices
-   * Adds 12-16 leading zeros to make target achievable at ~600 H/s
+   * Multiplies target by 2^56 to make it achievable at ~600 H/s
    * @param {string} realTarget - Real Bitcoin target (64 hex chars)
-   * @returns {string} Pseudo-target with adjusted difficulty
+   * @returns {string} Pseudo-target with adjusted difficulty (64 hex chars)
    */
   calculatePseudoTarget(realTarget) {
-    // For pseudo-mining, add 14 leading zeros to the target
-    // This makes it ~2^56 times easier, suitable for ESP32 at ~600 H/s
-    // Expected time: ~1-2 hours per share instead of ~6,700 years
-    const leadingZeros = '00000000000000'; // 14 zeros
-    const adjustedTarget = leadingZeros + realTarget.substring(14);
-    console.log('[JOB_MANAGER] PSEUDO_TARGET_CALCULATED real=' + realTarget + ' pseudo=' + adjustedTarget);
-    return adjustedTarget;
+    // Validate input
+    if (!realTarget || realTarget.length !== 64) {
+      console.error('[JOB_MANAGER] INVALID_TARGET_LENGTH length=' + (realTarget?.length || 'null'));
+      return realTarget; // Return original if invalid
+    }
+
+    // Maximum valid 256-bit target (all ones)
+    const MAX_UINT256 = BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
+
+    // Convert realTarget to BigInt
+    const realTargetBigInt = BigInt('0x' + realTarget);
+
+    // Multiply by 2^56 to make it ~72 quadrillion times easier
+    // This reduces expected time from ~6,700 years to ~1-2 hours at 600 H/s
+    const difficultyMultiplier = BigInt(2) ** BigInt(56);
+    const pseudoTargetBigInt = realTargetBigInt * difficultyMultiplier;
+
+    // Cap at maximum valid 256-bit target
+    const cappedPseudoTarget = pseudoTargetBigInt > MAX_UINT256 ? MAX_UINT256 : pseudoTargetBigInt;
+
+    // Convert back to 64-character hex string
+    let pseudoTargetHex = cappedPseudoTarget.toString(16).toLowerCase();
+    
+    // Pad to exactly 64 characters
+    while (pseudoTargetHex.length < 64) {
+      pseudoTargetHex = '0' + pseudoTargetHex;
+    }
+
+    // Verify output is exactly 64 characters
+    if (pseudoTargetHex.length !== 64) {
+      console.error('[JOB_MANAGER] PSEUDO_TARGET_LENGTH_ERROR length=' + pseudoTargetHex.length);
+      return realTarget;
+    }
+
+    // Verify pseudoTarget > realTarget (easier difficulty)
+    if (BigInt('0x' + pseudoTargetHex) <= realTargetBigInt) {
+      console.error('[JOB_MANAGER] PSEUDO_TARGET_NOT_EASIER pseudo=' + pseudoTargetHex + ' real=' + realTarget);
+      return realTarget;
+    }
+
+    console.log('[JOB_MANAGER] REAL_TARGET=' + realTarget);
+    console.log('[JOB_MANAGER] PSEUDO_TARGET_CALCULATED=' + pseudoTargetHex);
+    console.log('[JOB_MANAGER] TARGET_LENGTH=' + pseudoTargetHex.length);
+    
+    return pseudoTargetHex;
   }
 
   /**
@@ -300,10 +338,12 @@ class JobManager {
     if (usePseudoMining) {
       pseudoTarget = this.calculatePseudoTarget(baseJob.target);
       effectiveTarget = pseudoTarget;
-      console.log('[JOB_MANAGER] PSEUDO_MINING_ENABLED deviceId=' + deviceId + ' effectiveTarget=' + effectiveTarget);
+      console.log('[JOB_MANAGER] PSEUDO_MINING_ENABLED deviceId=' + deviceId);
+      console.log('[JOB_MANAGER] EFFECTIVE_TARGET=' + effectiveTarget);
     } else {
       effectiveTarget = baseJob.target;
-      console.log('[JOB_MANAGER] REAL_MINING deviceId=' + deviceId + ' effectiveTarget=' + effectiveTarget);
+      console.log('[JOB_MANAGER] REAL_MINING deviceId=' + deviceId);
+      console.log('[JOB_MANAGER] EFFECTIVE_TARGET=' + effectiveTarget);
     }
 
     // Return device context with target selection
